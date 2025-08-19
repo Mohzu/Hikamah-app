@@ -1,11 +1,11 @@
 import express, { Router } from 'express';
-import { isGuru } from '../middleware/authMiddleware';
+import { isGuru } from '../middleware/authMiddleware.js';
 import { 
     getProfile, 
     createAbsensi, 
     inputNilai, 
     getJadwalGuru
-} from '../controllers/guruController';
+} from '../controllers/guruController.js';
 
 const router: Router = express.Router();
 

@@ -1,5 +1,5 @@
 import express, { Router } from 'express';
-import { isAdmin } from '../middleware/authMiddleware';
+import { isAdmin } from '../middleware/authMiddleware.js';
 import {
     createMapel,
     getAllMapel,
@@ -10,7 +10,7 @@ import {
     updateGuruOnJadwal,
     deleteJadwal,
     updateJadwalMengajar
-} from '../controllers/akademikController';
+} from '../controllers/akademikController.js';
 
 const router: Router = express.Router();
 

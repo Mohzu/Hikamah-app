@@ -1,6 +1,6 @@
 import express, { Router, Request, Response, NextFunction } from 'express';
-import { register, login, logout, getLoginStatus } from '../controllers/authController';
-import { isLoggedIn } from '../middleware/authMiddleware';
+import { register, login, logout, getLoginStatus } from '../controllers/authController.js';
+import { isLoggedIn } from '../middleware/authMiddleware.js';
 
 const router: Router = express.Router();
 
