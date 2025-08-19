@@ -2,13 +2,27 @@
 
 // --- IMPORTS ---
 import { Request, Response } from 'express';
-import pool from '../config/db';
-import { RowDataPacket, OkPacket } from 'mysql2/promise';
+import pool from '../config/db.js';
+import { RowDataPacket, OkPacket, ResultSetHeader } from 'mysql2/promise';
 import { z } from 'zod';
 
 // --- INTERFACES & SKEMA ---
-interface MataPelajaran extends RowDataPacket { /*...*/ }
-interface JadwalDetail extends RowDataPacket { /*...*/ }
+interface MataPelajaranRow extends RowDataPacket { 
+    id: number;
+    nama_mapel: string;
+    deskripsi: string | null;
+    kategori?: string; // Kolom ini digunakan di controller lain
+}
+interface JadwalDetailRow extends RowDataPacket {
+    id_jadwal: number;
+    tahun_ajaran: string;
+    nama_kelas: string;
+    nama_mapel: string;
+    nama_guru: string;
+    hari: string;
+    waktu_mulai: string;
+    waktu_selesai: string;
+}
 
 // Skema untuk memvalidasi ID numerik dari req.params
 const idParamSchema = z.object({ id: z.string().regex(/^\d+$/, "ID harus berupa angka") });
@@ -23,7 +37,6 @@ const mapelSchema = z.object({
     nama_mapel: z.string().min(1, "Nama mata pelajaran harus diisi"),
     deskripsi: z.string().optional().nullable()
 });
-// SKEMA UNTUK MENUGASKAN GURU
 const assignGuruSchema = z.object({
     id_guru: z.number().int().positive("ID Guru harus angka positif"),
     tahun_ajaran: z.string().regex(/^\d{4}\/\d{4}$/, "Format tahun ajaran harus YYYY/YYYY"),
@@ -63,7 +76,7 @@ export const createMapel = async (req: Request, res: Response) => {
 
 export const getAllMapel = async (req: Request, res: Response) => {
     try {
-        const [mapels] = await pool.query<MataPelajaran[]>('SELECT * FROM mata_pelajaran ORDER BY nama_mapel ASC');
+        const [mapels] = await pool.query<MataPelajaranRow[]>('SELECT * FROM mata_pelajaran ORDER BY nama_mapel ASC');
         res.status(200).json({ success: true, data: mapels });
     } catch (error: any) {
         res.status(500).json({ success: false, error: "Gagal mengambil data mata pelajaran." });
@@ -83,7 +96,6 @@ export const deleteMapel = async (req: Request<{ id_mapel: string }>, res: Respo
 };
 
 // --- MANAJEMEN KURIKULUM ---
-
 export const addMapelToJenjang = async (req: Request<{ id_jenjang: string }>, res: Response) => {
     const validation = z.object({ id_mapel: z.number().int().positive() }).safeParse(req.body);
     if (!validation.success) return res.status(400).json({ success: false, error: "Data tidak valid", details: validation.error.flatten().fieldErrors });
@@ -112,9 +124,9 @@ export const assignGuruToJadwal = async (req: Request<{ id_kelas: string, id_map
     const { id_guru, tahun_ajaran, hari, waktu_mulai, waktu_selesai } = bodyValidation.data;
     
     try {
-        const [guru] = await pool.query('SELECT id FROM guru WHERE id = ?', [id_guru]);
-        const [mapel] = await pool.query('SELECT id FROM mata_pelajaran WHERE id = ?', [id_mapel]);
-        const [kelas] = await pool.query('SELECT id FROM kelas WHERE id = ?', [id_kelas]);
+        const [guru] = await pool.query<RowDataPacket[]>('SELECT id FROM guru WHERE id = ?', [id_guru]);
+        const [mapel] = await pool.query<RowDataPacket[]>('SELECT id FROM mata_pelajaran WHERE id = ?', [id_mapel]);
+        const [kelas] = await pool.query<RowDataPacket[]>('SELECT id FROM kelas WHERE id = ?', [id_kelas]);
 
         if (guru.length === 0 || mapel.length === 0 || kelas.length === 0) {
             return res.status(404).json({ success: false, error: "ID guru, mata pelajaran, atau kelas tidak ditemukan." });
@@ -143,7 +155,7 @@ export const updateGuruOnJadwal = async (req: Request<{ id_jadwal: string }>, re
     const { id_guru_baru } = validation.data;
     
     try {
-        const [guruBaru] = await pool.query('SELECT id FROM guru WHERE id = ?', [id_guru_baru]);
+        const [guruBaru] = await pool.query<RowDataPacket[]>('SELECT id FROM guru WHERE id = ?', [id_guru_baru]);
         if (guruBaru.length === 0) {
             return res.status(404).json({ success: false, error: "ID guru baru tidak ditemukan." });
         }
@@ -194,7 +206,7 @@ export const getAllJadwal = async (req: Request, res: Response) => {
             ORDER BY FIELD(jm.hari, 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'), jm.waktu_mulai ASC
         `;
         
-        const [jadwalList] = await pool.query<JadwalDetail[]>(query);
+        const [jadwalList] = await pool.query<JadwalDetailRow[]>(query);
         
         if (jadwalList.length === 0) {
             return res.status(200).json({ success: true, data: {} });
@@ -215,7 +227,7 @@ export const getAllJadwal = async (req: Request, res: Response) => {
             });
             
             return acc;
-        }, {} as Record<string, any[]>);
+        }, {} as Record<string, Record<string, any[]>>);
 
         res.status(200).json({ success: true, data: groupedJadwal });
     } catch (error: any) {

@@ -1,12 +1,12 @@
 import express, { Router } from 'express';
-import { isAdmin } from '../middleware/authMiddleware';
+import { isAdmin } from '../middleware/authMiddleware.js';
 import {
 getUnverifiedRegistrations,
 getAllSantri,
 verifyRegistration,
 updateNisn,
 deleteSantri
-} from '../controllers/santriManagementController';
+} from '../controllers/santriManagementController.js';
 const router: Router = express.Router();
 // Semua rute di file ini hanya untuk Admin
 router.use(isAdmin);

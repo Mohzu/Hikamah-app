@@ -1,11 +1,13 @@
 // --- IMPORTS ---
 import { Request, Response } from 'express';
-import pool from '../config/db';
+import pool from '../config/db.js';
 import bcrypt from 'bcryptjs';
 import { RowDataPacket, OkPacket, PoolConnection } from 'mysql2/promise';
 import { z } from 'zod';
 
 // --- INTERFACES & SKEMA ZOD ---
+
+// Tipe data dari database (tetap berguna)
 interface UserRow extends RowDataPacket {
     id: number;
     kata_sandi: string;
@@ -18,15 +20,94 @@ interface SantriRow extends RowDataPacket {
     id: number;
     nama_lengkap: string;
 }
+
+// Skema untuk Login
 const loginSchema = z.object({
     username: z.string().min(1, "Username harus diisi"),
     kata_sandi: z.string().min(1, "Kata sandi harus diisi")
 });
-// Skema register tidak ditampilkan lagi untuk keringkasan
+
+// Skema untuk Pendaftaran
+const registerSchema = z.object({
+    // Data Santri
+    nomor_induk: z.string().length(13, "Nomor Induk harus 13 digit").regex(/^\d+$/, "Nomor Induk hanya boleh berisi angka"),
+    nama_santri: z.string().min(3, "Nama santri harus diisi"),
+    tempat_lahir_santri: z.string().min(1, "Tempat lahir santri harus diisi"),
+    tanggal_lahir_santri: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal lahir harus YYYY-MM-DD"),
+    jenis_kelamin: z.enum(['L', 'P']),
+    anak_ke: z.number().int().positive(),
+    dari_bersaudara: z.number().int().positive(),
+    agama: z.string().min(1, "Agama harus diisi"),
+    alamat_santri: z.string().min(1, "Alamat santri harus diisi"),
+    
+    // Data Orang Tua (dibuat opsional dengan default string kosong)
+    nama_ayah: z.string().default(''), tempat_lahir_ayah: z.string().default(''), tanggal_lahir_ayah: z.string().default(''),
+    pekerjaan_ayah: z.string().default(''), pendidikan_ayah: z.string().default(''), alamat_ayah: z.string().default(''), nomor_hp_ayah: z.string().default(''),
+    nama_ibu: z.string().default(''), tempat_lahir_ibu: z.string().default(''), tanggal_lahir_ibu: z.string().default(''),
+    pekerjaan_ibu: z.string().default(''), pendidikan_ibu: z.string().default(''), alamat_ibu: z.string().default(''), nomor_hp_ibu: z.string().default(''),
+    
+    // Data Akun Wali
+    email_wali: z.string().email("Format email wali tidak valid"),
+    hubungan_wali: z.enum(['Ayah', 'Ibu'])
+});
 
 // --- FUNGSI CONTROLLER ---
+
 export const register = async (req: Request, res: Response) => {
-    // ... (kode register Anda)
+    const validationResult = registerSchema.safeParse(req.body);
+    if (!validationResult.success) {
+        return res.status(400).json({ success: false, error: "Data pendaftaran tidak valid", details: validationResult.error.flatten().fieldErrors });
+    }
+    
+    const { 
+        nomor_induk, nama_santri, tanggal_lahir_santri, email_wali, hubungan_wali, 
+        nama_ayah, tempat_lahir_ayah, tanggal_lahir_ayah, pekerjaan_ayah, pendidikan_ayah, alamat_ayah, nomor_hp_ayah,
+        nama_ibu, tempat_lahir_ibu, tanggal_lahir_ibu, pekerjaan_ibu, pendidikan_ibu, alamat_ibu, nomor_hp_ibu,
+        ...dataLainnya 
+    } = validationResult.data;
+
+    let connection: PoolConnection | undefined; 
+    try {
+        connection = await pool.getConnection();
+        if (!connection) throw new Error('Gagal mendapatkan koneksi database.');
+        await connection.beginTransaction();
+
+        const [emailCheck] = await connection.query<RowDataPacket[]>('SELECT id FROM pengguna WHERE email = ?', [email_wali]);
+        if (emailCheck.length > 0) throw new Error('Email wali ini sudah terdaftar.');
+        
+        const [indukCheck] = await connection.query<RowDataPacket[]>('SELECT id FROM santri WHERE nomor_induk = ?', [nomor_induk]);
+        if (indukCheck.length > 0) throw new Error('Nomor Induk ini sudah terdaftar.');
+
+        const nama_wali_akun = hubungan_wali.toLowerCase() === 'ayah' ? nama_ayah : nama_ibu;
+        const nomor_hp_wali_akun = hubungan_wali.toLowerCase() === 'ayah' ? nomor_hp_ayah : nomor_hp_ibu;
+        
+        const tempPassword = tanggal_lahir_santri.replace(/-/g, '');
+        const hashedPassword = await bcrypt.hash(tempPassword, 10);
+        
+        const [resultWali] = await connection.query<OkPacket>('INSERT INTO pengguna (nama_lengkap, email, kata_sandi, nomor_hp, peran, status_aktif) VALUES (?, ?, ?, ?, ?, ?)', [nama_wali_akun, email_wali, hashedPassword, nomor_hp_wali_akun, 'Wali Santri', false]);
+        const idWaliPengguna = resultWali.insertId;
+
+        const [resultSantri] = await connection.query<OkPacket>('INSERT INTO santri (id_wali, nomor_induk, nama_lengkap, tempat_lahir, tanggal_lahir, jenis_kelamin, anak_ke, dari_bersaudara, agama, alamat, tanggal_daftar) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [idWaliPengguna, nomor_induk, nama_santri, dataLainnya.tempat_lahir_santri, tanggal_lahir_santri, dataLainnya.jenis_kelamin, dataLainnya.anak_ke, dataLainnya.dari_bersaudara, dataLainnya.agama, dataLainnya.alamat_santri, new Date()]);
+        const idSantri = resultSantri.insertId;
+        
+        await connection.query('INSERT INTO orang_tua (id_santri, status_hubungan, nama_lengkap, tempat_lahir, tanggal_lahir, pekerjaan, pendidikan_terakhir, alamat, nomor_hp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [idSantri, 'Ayah', nama_ayah, tempat_lahir_ayah, tanggal_lahir_ayah, pekerjaan_ayah, pendidikan_ayah, alamat_ayah, nomor_hp_ayah]);
+        await connection.query('INSERT INTO orang_tua (id_santri, status_hubungan, nama_lengkap, tempat_lahir, tanggal_lahir, pekerjaan, pendidikan_terakhir, alamat, nomor_hp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [idSantri, 'Ibu', nama_ibu, tempat_lahir_ibu, tanggal_lahir_ibu, pekerjaan_ibu, pendidikan_ibu, alamat_ibu, nomor_hp_ibu]);
+        
+        await connection.commit();
+        res.status(201).json({ success: true, data: { message: 'Pendaftaran berhasil. Data Anda akan diverifikasi oleh admin.' } });
+
+    } catch (error: any) {
+        if (connection) await connection.rollback();
+        console.error('Ada error saat pendaftaran:', error);
+        
+        if (error.message.includes('terdaftar')) {
+            res.status(409).json({ success: false, error: error.message });
+        } else {
+            res.status(500).json({ success: false, error: 'Pendaftaran gagal karena kesalahan server.' });
+        }
+    } finally {
+        if (connection) connection.release();
+    }
 };
 
 export const login = async (req: Request, res: Response) => {
@@ -120,9 +201,20 @@ export const login = async (req: Request, res: Response) => {
 };
 
 export const getLoginStatus = (req: Request, res: Response) => {
-    // ... (kode getLoginStatus Anda)
+    if (req.session.user) {
+        res.status(200).json({ success: true, data: { loggedIn: true, user: req.session.user } });
+    } else {
+        res.status(200).json({ success: true, data: { loggedIn: false } });
+    }
 };
 
 export const logout = (req: Request, res: Response) => {
-    // ... (kode logout Anda)
+    req.session.destroy(err => {
+        if (err) {
+            console.error("Gagal menghancurkan sesi:", err);
+            return res.status(500).json({ success: false, error: 'Gagal logout.' });
+        }
+        res.clearCookie('connect.sid');
+        res.status(200).json({ success: true, data: { message: 'Logout berhasil.' } });
+    });
 };

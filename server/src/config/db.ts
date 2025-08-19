@@ -1,12 +1,18 @@
-// --- IMPORTS ---
+// src/config/db.ts
 import mysql from 'mysql2/promise';
 import dotenv from 'dotenv';
 import path from 'path';
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
+import { fileURLToPath } from 'url';
 
+// Dapatkan path absolut ke folder root
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const rootPath = path.resolve(__dirname, '../../');
+
+// Muat variabel lingkungan dari file .env
+dotenv.config({ path: path.join(rootPath, '.env') });
 
 // --- Konfigurasi Koneksi Database ---
-// Membuat pool koneksi yang akan digunakan di seluruh aplikasi.
 const pool = mysql.createPool({
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
@@ -17,5 +23,5 @@ const pool = mysql.createPool({
     queueLimit: 0
 });
 
-// --- Ekspor Pool Koneksi ---
+// --- EKSPOR ---
 export default pool;

@@ -1,6 +1,6 @@
 import express, { Router } from 'express';
-import { isAdmin } from '../middleware/authMiddleware';
-import { changePassword, changeUsername } from '../controllers/adminController';
+import { isAdmin } from '../middleware/authMiddleware.js';
+import { changePassword, changeUsername } from '../controllers/adminController.js';
 
 const router: Router = express.Router();
 

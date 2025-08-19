@@ -8,10 +8,10 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-
+    "baseUrl": ".",
     "paths": {
-      "shared-types": ["packages/shared-types/src"],
-      "shared-types/*": ["packages/shared-types/src/*"]
+      "shared-types": ["./packages/shared-types/src"],
+      "shared-types/*": ["./packages/shared-types/src/*"]
     }
   }
 }

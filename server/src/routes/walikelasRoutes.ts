@@ -1,5 +1,5 @@
 import express, { Router } from 'express';
-import { isWaliKelas } from '../middleware/authMiddleware'; // Middleware khusus untuk wali kelas
+import { isWaliKelas } from '../middleware/authMiddleware.js'; // Middleware khusus untuk wali kelas
 import {
     getSantriByWaliKelas,
     setKenaikanKelas,
@@ -7,7 +7,7 @@ import {
     getCatatanPerilaku,
     updateCatatanPerilaku,
     deleteCatatanPerilaku
-} from '../controllers/walikelasController';
+} from '../controllers/walikelasController.js';
 
 const router: Router = express.Router();
 router.use(isWaliKelas);

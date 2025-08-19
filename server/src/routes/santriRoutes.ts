@@ -1,25 +1,20 @@
 // --- IMPORTS ---
-// Impor dasar dari express
+
 import express, { Router, Request } from 'express';
-// Impor 'path' untuk menangani ekstensi file
 import path from 'path';
-// Impor 'multer' untuk menangani upload file, dan tipenya
 import multer, { FileFilterCallback } from 'multer';
+import { isSantri } from '../middleware/authMiddleware.js';
 
-// Impor middleware keamanan Anda
-import { isSantri } from '../middleware/authMiddleware';
-
-// Impor semua fungsi controller yang akan digunakan oleh rute ini
 import {
     changePassword,
     changeUsername,
     updateBiodata,
-    uploadPhoto, // Controller yang akan menggunakan multer
+    uploadPhoto, 
     getFullProfile,
     getMyNilai,
     getRaporSemester,
     getJadwalPelajaran
-} from '../controllers/santriController';
+} from '../controllers/santriController.js';
 
 
 // Buat instance router
