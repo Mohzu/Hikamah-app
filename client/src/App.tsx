@@ -1,6 +1,7 @@
 import React from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { LoginPage } from './components/LoginPage'; // Pastikan path benar
+import { RegistrationPage } from './components/RegistrationPage'; // Impor halaman registrasi
 
 // Buat komponen placeholder untuk dashboard (atau komponen lain)
 const DashboardPage = () => (
@@ -13,6 +14,7 @@ function App() {
   return (
     <Routes>
       <Route path="/" element={<LoginPage />} />
+      <Route path="/register" element={<RegistrationPage />} />
       <Route path="/dashboard" element={<DashboardPage />} />
       {/* Tambahkan rute lain di sini sesuai kebutuhan aplikasi Anda */}
     </Routes>

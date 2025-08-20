@@ -1,7 +1,7 @@
 // client/src/components/LoginPage.tsx
 import React, { useState } from 'react';
 import { BookOpen, Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import axios from 'axios';
 
@@ -34,7 +34,7 @@ const handleSubmit = async (e: React.FormEvent) => {
 
       if (response.status === 200 && response.data.success) {
         toast.success(response.data.data.message || 'Login berhasil!');
-        navigate('/');
+        navigate('/dashboard'); // Arahkan ke dashboard setelah login berhasil
       } else {
         setError(response.data.error || 'Respons login tidak valid.');
         toast.error(response.data.error || 'Respons login tidak valid.');
@@ -155,6 +155,16 @@ const handleSubmit = async (e: React.FormEvent) => {
               </button>
             </div>
           </form>
+          
+          <div className="mt-6 text-center">
+            <p className="text-sm text-gray-600">
+              Belum punya akun?{' '}
+              <Link to="/register" className="font-medium text-teal-600 hover:text-teal-500">
+                Daftar Santri Baru
+              </Link>
+            </p>
+          </div>
+
         </div>
 
         {/* Footer */}
