@@ -231,7 +231,7 @@ export const changeUsername = async (req: Request, res: Response) => {
   }
 };
 
-export const uploadPhoto = async (req, res) => {
+export const uploadPhoto = async (req: Request, res: Response) => {
     const id_santri = req.session?.user?.id_santri;
     if (!id_santri) {
         console.error("ID Santri tidak ditemukan di sesi.");
@@ -713,4 +713,42 @@ WHERE id_santri = ? AND tahun_ajaran = ? GROUP BY status`,
       .status(500)
       .json({ success: false, error: "Gagal mengambil data rapor." });
   }
+};
+
+// Fungsi baru untuk mengambil ringkasan dashboard santri
+export const getSantriDashboardSummary = async (req: Request, res: Response) => {
+    if (!req.session.user || req.session.user.peran !== 'Santri' || !req.session.user.id_santri) {
+        return res.status(401).json({ success: false, error: 'Akses ditolak. Anda harus login sebagai Santri.' });
+    }
+    
+    const id_santri = req.session.user.id_santri;
+    
+    try {
+        // Mengambil data nilai rata-rata
+        const [nilaiData] = await pool.query<RowDataPacket[]>('SELECT AVG(nilai_akhir) AS rata_rata_nilai FROM nilai WHERE id_santri = ?', [id_santri]);
+        const rataRataNilai = nilaiData[0].rata_rata_nilai ? parseFloat(nilaiData[0].rata_rata_nilai) : 0;
+
+        // Mengambil data pembayaran (asumsi total tagihan hardcoded 13.300.000)
+        const [pembayaranData] = await pool.query<RowDataPacket[]>('SELECT SUM(jumlah) AS total_terbayar FROM pembayaran WHERE id_santri = ?', [id_santri]);
+        const totalTerbayar = pembayaranData[0].total_terbayar ? parseFloat(pembayaranData[0].total_terbayar) : 0;
+        const sisaTagihan = 13300000 - totalTerbayar; 
+
+        // Mengambil data hafalan (asumsi 'nama_juz_surah' berisi angka juz, misal '3 Juz')
+        const [hafalanData] = await pool.query<RowDataPacket[]>('SELECT nama_juz_surah FROM progres_hafalan WHERE id_santri = ? ORDER BY tanggal_setoran DESC LIMIT 1', [id_santri]);
+        const progressHafalan = hafalanData.length > 0 && hafalanData[0].nama_juz_surah ? parseInt(hafalanData[0].nama_juz_surah.split(' ')[0]) : 0;
+
+        res.status(200).json({
+            success: true,
+            data: {
+                sisa_tagihan: sisaTagihan,
+                total_terbayar: totalTerbayar,
+                rata_rata_nilai: rataRataNilai,
+                progress_hafalan: progressHafalan
+            }
+        });
+        
+    } catch (error: any) {
+        console.error("Error saat mengambil data dashboard summary santri:", error);
+        res.status(500).json({ success: false, error: "Gagal mengambil data dashboard summary." });
+    }
 };

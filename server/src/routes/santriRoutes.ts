@@ -13,7 +13,8 @@ import {
     getFullProfile,
     getMyNilai,
     getRaporSemester,
-    getJadwalPelajaran
+    getJadwalPelajaran,
+    getSantriDashboardSummary // Import fungsi baru di sini
 } from '../controllers/santriController.js';
 
 
@@ -83,6 +84,9 @@ router.post('/upload-photo', upload.single('profilePhoto'), uploadPhoto);
 router.get('/jadwal', getJadwalPelajaran);
 router.get('/my-nilai', getMyNilai);
 router.get('/rapor', getRaporSemester);
+
+// Rute baru untuk ringkasan dashboard santri
+router.get('/dashboard-summary', getSantriDashboardSummary);
 
 
 // Ekspor router agar bisa digunakan di index.ts

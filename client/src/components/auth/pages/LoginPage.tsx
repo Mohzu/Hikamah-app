@@ -1,9 +1,16 @@
-// client/src/components/LoginPage.tsx
 import React, { useState } from 'react';
 import { BookOpen, Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
-import { toast } from 'react-toastify';
+import { toast } from 'react-toastify'; // Pastikan Anda sudah menginstal react-toastify
 import axios from 'axios';
+
+interface User {
+  id: number;
+  username: string;
+  nama_lengkap: string;
+  peran: 'Admin' | 'Guru' | 'Santri' | 'Wali Santri';
+  status_aktif?: number;
+}
 
 export function LoginPage() {
   // Mengubah state dari 'email' menjadi 'username'
@@ -14,7 +21,7 @@ export function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
-const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -25,31 +32,54 @@ const handleSubmit = async (e: React.FormEvent) => {
 
     setIsLoading(true);
     try {
-      const response = await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/login`, {
-        username,
-        kata_sandi: password,
-      }, {
-        withCredentials: true,
-      });
+  const response = await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/login`, {
+    username,
+    kata_sandi: password,
+  }, {
+    withCredentials: true,
+  });
 
-      if (response.status === 200 && response.data.success) {
-        toast.success(response.data.data.message || 'Login berhasil!');
-        navigate('/dashboard'); // Arahkan ke dashboard setelah login berhasil
-      } else {
-        setError(response.data.error || 'Respons login tidak valid.');
-        toast.error(response.data.error || 'Respons login tidak valid.');
+  if (response.status === 200 && response.data.success) {
+    toast.success(response.data.data.message || 'Login berhasil!');
+
+    const user: User = response.data.data.user;
+
+    if (user) {
+      switch (user.peran) {
+        case 'Admin':
+          navigate('/parent/');
+          break;
+        case 'Guru':
+          navigate('/guru/dashboard');
+          break;
+        case 'Santri':
+          navigate('/parent/');
+          break;
+        case 'Wali Santri':
+          navigate('/parent/');
+          break;
+        default:
+          navigate('/dashboard');
       }
-    } catch (err) {
-      if (axios.isAxiosError(err) && err.response) {
-        setError(err.response.data.error || 'Username atau kata sandi salah.');
-        toast.error(err.response.data.error || 'Login gagal. Coba lagi.');
-      } else {
-        setError('Terjadi kesalahan. Silakan coba lagi.');
-        toast.error('Terjadi kesalahan. Silakan coba lagi.');
-      }
-    } finally {
-      setIsLoading(false);
     }
+
+  } else {
+    setError(response.data.error || 'Respons login tidak valid.');
+    toast.error(response.data.error || 'Respons login tidak valid.');
+  }
+
+} catch (err) {
+  if (axios.isAxiosError(err) && err.response) {
+    setError(err.response.data.error || 'Username atau kata sandi salah.');
+    toast.error(err.response.data.error || 'Login gagal. Coba lagi.');
+  } else {
+    setError('Terjadi kesalahan. Silakan coba lagi.');
+    toast.error('Terjadi kesalahan. Silakan coba lagi.');
+  }
+} finally {
+  setIsLoading(false);
+}
+
   };
 
   return (
@@ -75,7 +105,6 @@ const handleSubmit = async (e: React.FormEvent) => {
             )}
 
             <div>
-              {/* Mengubah label dan input dari 'email' menjadi 'username' */}
               <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
                 Username
               </label>
@@ -155,16 +184,16 @@ const handleSubmit = async (e: React.FormEvent) => {
               </button>
             </div>
           </form>
-          
+
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
               Belum punya akun?{' '}
-              <Link to="/register" className="font-medium text-teal-600 hover:text-teal-500">
+              {/* ==== PENTING: Ubah jalur Link ini agar sesuai dengan rute AuthModule ==== */}
+              <Link to="/auth/register" className="font-medium text-teal-600 hover:text-teal-500">
                 Daftar Santri Baru
               </Link>
             </p>
           </div>
-
         </div>
 
         {/* Footer */}
