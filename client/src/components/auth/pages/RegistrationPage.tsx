@@ -1,11 +1,10 @@
-// src/components/features/auth/RegistrationPage.tsx
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, BookOpen, UserCheck } from 'lucide-react'; // Menambahkan ikon UserCheck
+import { useNavigate, Link } from 'react-router-dom';
+import { ArrowLeft, BookOpen, UserCheck } from 'lucide-react';
 import { toast } from 'react-toastify';
 import axios from 'axios';
 
-// Helper components (tidak ada perubahan)
+// Helper components
 const SectionTitle: React.FC<{ title: string }> = ({ title }) => (
   <h2 className="text-xl font-bold text-gray-800 border-b-2 border-teal-500 pb-2 mb-4">{title}</h2>
 );
@@ -56,9 +55,9 @@ export function RegistrationPage() {
     pendidikanIbu: '',
     alamatIbu: '',
     noHpIbu: '',
-    // PERUBAHAN 1: Menambahkan state untuk data akun wali
+    // Akun Wali
     emailWali: '',
-    hubunganWali: 'Ayah', // Default value
+    hubunganWali: 'Ayah',
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -69,7 +68,6 @@ export function RegistrationPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // PERUBAHAN 2: Transformasi data dari camelCase ke snake_case sebelum mengirim
     const dataToSubmit = {
         // Data Santri
         nomor_induk: formData.noInduk,
@@ -77,8 +75,8 @@ export function RegistrationPage() {
         tempat_lahir_santri: formData.tempatLahirSantri,
         tanggal_lahir_santri: formData.tanggalLahirSantri,
         jenis_kelamin: formData.jenisKelamin,
-        anak_ke: parseInt(formData.anakKe, 10) || 0, // Konversi ke number
-        dari_bersaudara: parseInt(formData.dariBersaudara, 10) || 0, // Konversi ke number
+        anak_ke: parseInt(formData.anakKe, 10) || 0,
+        dari_bersaudara: parseInt(formData.dariBersaudara, 10) || 0,
         agama: formData.agama,
         alamat_santri: formData.alamatSantri,
         
@@ -100,23 +98,21 @@ export function RegistrationPage() {
         alamat_ibu: formData.alamatIbu,
         nomor_hp_ibu: formData.noHpIbu,
 
-        // Data Akun Wali
+        // Data Akun Wali (tanpa kata sandi)
         email_wali: formData.emailWali,
         hubungan_wali: formData.hubunganWali
     };
 
     try {
-        // const response = await axios.post(`${import.meta.env.VITE_API_URL}/api/students/register`, dataToSubmit);
       const response = await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/register`, dataToSubmit);
       if (response.status === 201) {
-          toast.success('Pendaftaran berhasil! Data Anda akan segera diverifikasi oleh admin.');
-          navigate('/'); 
+        toast.success('Pendaftaran berhasil! Data Anda akan segera diverifikasi oleh admin.');
+        navigate('/auth/login');
       }
-    } catch (error: any) { // Menambahkan 'any' untuk akses ke response
-        console.error('Registration failed:', error);
-        // Menampilkan pesan error dari backend jika ada
-        const errorMessage = error.response?.data?.error || 'Pendaftaran gagal. Silakan coba lagi.';
-        toast.error(errorMessage);
+    } catch (error: any) {
+      console.error('Registration failed:', error);
+      const errorMessage = error.response?.data?.error || 'Pendaftaran gagal. Silakan coba lagi.';
+      toast.error(errorMessage);
     }
   };
 
@@ -133,7 +129,7 @@ export function RegistrationPage() {
           </div>
           
           <form onSubmit={handleSubmit} className="space-y-8">
-            {/* Data Santri (tidak ada perubahan signifikan di sini) */}
+            {/* Data Santri */}
             <div>
               <SectionTitle title="A. Data Calon Santri" />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -178,7 +174,7 @@ export function RegistrationPage() {
               </div>
             </div>
 
-            {/* Data Orang Tua (tidak ada perubahan di sini) */}
+            {/* Data Orang Tua / Wali Santri */}
             <div>
               <SectionTitle title="B. Data Orang Tua / Wali Santri" />
               <div className="space-y-6">
@@ -221,30 +217,30 @@ export function RegistrationPage() {
               </div>
             </div>
 
-            {/* PERUBAHAN 3: Menambahkan form untuk data akun wali */}
+            {/* Data Akun Wali (tanpa kata sandi) */}
             <div>
               <SectionTitle title="C. Data Akun Wali" />
               <div className="p-4 rounded-lg grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <InputField label="Email Wali" name="emailWali" value={formData.emailWali} onChange={handleChange} placeholder="cth: wali@email.com" type="email" />
-                  <div>
-                      <label htmlFor="hubunganWali" className="block text-sm font-medium text-gray-700 mb-1">Akun Didaftarkan Atas Nama</label>
-                      <select id="hubunganWali" name="hubunganWali" value={formData.hubunganWali} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-teal-500 focus:border-teal-500">
-                          <option value="Ayah">Ayah</option>
-                          <option value="Ibu">Ibu</option>
-                      </select>
-                  </div>
+                <InputField label="Email Wali" name="emailWali" value={formData.emailWali} onChange={handleChange} placeholder="cth: wali@email.com" type="email" />
+                <div>
+                  <label htmlFor="hubunganWali" className="block text-sm font-medium text-gray-700 mb-1">Akun Didaftarkan Atas Nama</label>
+                  <select id="hubunganWali" name="hubunganWali" value={formData.hubunganWali} onChange={handleChange} className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-teal-500 focus:border-teal-500">
+                      <option value="Ayah">Ayah</option>
+                      <option value="Ibu">Ibu</option>
+                  </select>
+                </div>
               </div>
             </div>
 
             <div className="flex items-center justify-between pt-6 border-t">
-                <button type="button" onClick={() => navigate('/')} className="flex items-center text-sm text-gray-600 hover:text-teal-500">
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    Kembali ke Login
-                </button>
-                <button type="submit" className="px-6 py-2 bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-md shadow-sm hover:from-teal-700 hover:to-teal-800 flex items-center">
-                    <UserCheck className="w-4 h-4 mr-2"/>
-                    Daftar
-                </button>
+              <Link to="/auth/login" className="flex items-center text-sm text-gray-600 hover:text-teal-500">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Kembali ke Login
+              </Link>
+              <button type="submit" className="px-6 py-2 bg-gradient-to-r from-teal-600 to-teal-700 text-white rounded-md shadow-sm hover:from-teal-700 hover:to-teal-800 flex items-center">
+                <UserCheck className="w-4 h-4 mr-2"/>
+                Daftar
+              </button>
             </div>
           </form>
         </div>

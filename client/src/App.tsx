@@ -1,22 +1,86 @@
 import React from 'react';
-import { Routes, Route } from 'react-router-dom';
-import { LoginPage } from './components/LoginPage'; // Pastikan path benar
-import { RegistrationPage } from './components/RegistrationPage'; // Impor halaman registrasi
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { AuthRoutes } from './components/auth/AuthRoutes';
+import { ParentRoutes } from './components/ParentModule/parentroutes';
+import { MainTemplate } from './components/ParentModule/templates/MainTemplate';
+import { useAuth } from './contexts/AuthContexts';
+import { DashboardPage } from '../src/components/ParentModule/pages/DashboardPage';
 
-// Buat komponen placeholder untuk dashboard (atau komponen lain)
-const DashboardPage = () => (
-  <div className="min-h-screen flex items-center justify-center bg-gray-100">
-    <h1 className="text-3xl font-bold text-gray-800">Selamat Datang di Dashboard!</h1>
-  </div>
-);
+interface ProtectedRouteProps {
+  isAllowed: boolean;
+  redirectPath?: string;
+  children: React.ReactNode;
+}
+
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
+  isAllowed,
+  redirectPath = "/auth/login",
+  children,
+}) => {
+  if (!isAllowed) {
+    return <Navigate to={redirectPath} replace />;
+  }
+  return <>{children}</>;
+};
 
 function App() {
+  const { isLoggedIn, user, isLoading } = useAuth();
+
+  if (isLoading) return <div>Loading...</div>;
+
+  console.log("[App] isLoggedIn:", isLoggedIn);
+  console.log("[App] user:", user);
+
   return (
     <Routes>
-      <Route path="/" element={<LoginPage />} />
-      <Route path="/register" element={<RegistrationPage />} />
-      <Route path="/dashboard" element={<DashboardPage />} />
-      {/* Tambahkan rute lain di sini sesuai kebutuhan aplikasi Anda */}
+      {/* Default redirect ke login */}
+      <Route path="/" element={<Navigate to="/auth/login" replace />} />
+
+      {/* Auth */}
+      <Route path="/auth/*" element={<AuthRoutes />} />
+
+      {/* Admin */}
+      <Route
+        path="/admin/*"
+        element={
+          <ProtectedRoute isAllowed={isLoggedIn && user?.peran === "Admin"}>
+            <MainTemplate>
+              <div>Halaman Admin (nanti buat AdminRoutes)</div>
+            </MainTemplate>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Guru */}
+      <Route
+        path="/guru/*"
+        element={
+          <ProtectedRoute isAllowed={isLoggedIn && user?.peran === "Guru"}>
+            <MainTemplate>
+              <div>Halaman Guru (nanti buat GuruRoutes)</div>
+            </MainTemplate>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Santri / Parent */}
+      <Route
+        path="/parent/*"
+        element={
+          <ProtectedRoute isAllowed={isLoggedIn && user?.peran === "Santri"}>
+            <MainTemplate>
+              <Routes>
+                <Route path="dashboard" element={<DashboardPage />} />
+                {/* Rute lain untuk parent */}
+                <Route path="*" element={<ParentRoutes />} />
+              </Routes>
+            </MainTemplate>
+          </ProtectedRoute>
+        }
+      />
+
+      {/* Fallback */}
+      <Route path="*" element={<Navigate to="/auth/login" replace />} />
     </Routes>
   );
 }
