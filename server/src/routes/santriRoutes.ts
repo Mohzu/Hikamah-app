@@ -1,5 +1,6 @@
 // --- IMPORTS ---
 
+// --- IMPORTS ---
 import express, { Router, Request } from 'express';
 import path from 'path';
 import multer, { FileFilterCallback } from 'multer';
@@ -13,10 +14,11 @@ import {
     getFullProfile,
     getMyNilai,
     getRaporSemester,
+    getMyHafalan,
     getJadwalPelajaran,
-    getSantriDashboardSummary // Import fungsi baru di sini
-} from '../controllers/santriController.js';
-
+    getSantriDashboardSummary,
+    getAvailableRaporPeriods,
+} from '../controllers/santriController.js'; // Perhatikan tidak ada ".js" di sini
 
 // Buat instance router
 const router: Router = express.Router();
@@ -84,6 +86,8 @@ router.post('/upload-photo', upload.single('profilePhoto'), uploadPhoto);
 router.get('/jadwal', getJadwalPelajaran);
 router.get('/my-nilai', getMyNilai);
 router.get('/rapor', getRaporSemester);
+router.get("/hafalan", getMyHafalan);
+router.get("/available-rapor-periods", isSantri, getAvailableRaporPeriods);
 
 // Rute baru untuk ringkasan dashboard santri
 router.get('/dashboard-summary', getSantriDashboardSummary);

@@ -4,7 +4,8 @@ import {
     getProfile, 
     createAbsensi, 
     inputNilai, 
-    getJadwalGuru
+    getJadwalGuru,
+    inputHafalan
 } from '../controllers/guruController.js';
 
 const router: Router = express.Router();
@@ -16,5 +17,6 @@ router.get('/profile', getProfile);
 router.post('/absensi', createAbsensi);
 router.post('/nilai', inputNilai);
 router.get('/jadwal', getJadwalGuru);
+router.post('/hafalan', isGuru, inputHafalan);
 
 export default router;

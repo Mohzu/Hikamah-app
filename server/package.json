@@ -5,12 +5,10 @@
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/index.js",
-    "dev": "concurrently \"npm:dev:watch\" \"npm:dev:run\"",
-    "dev:watch": "tsc --watch",
-    "dev:run": "nodemon dist/index.js"
-  },
+  "build": "tsc",
+  "start": "node dist/index.js",
+  "dev": "concurrently \"tsc --watch\" \"nodemon dist/index.js\""
+},
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",

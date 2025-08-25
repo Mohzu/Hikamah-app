@@ -17,6 +17,23 @@ interface GuruProfile extends RowDataPacket {
     jabatan: string;
 }
 
+// Skema untuk satu item hafalan
+const hafalanItemSchema = z.object({
+    id_santri: z.number().int().positive(),
+    nama_juz_surah: z.string().min(1, "Nama Juz/Surah tidak boleh kosong"),
+    ayat_awal: z.number().int().positive().optional().nullable(),
+    ayat_akhir: z.number().int().positive().optional().nullable(),
+    status_hafalan: z.enum(['Lulus', 'Ulangi', 'Belum Sempurna']),
+    catatan_guru: z.string().optional().nullable(),
+});
+
+// Skema untuk body request inputHafalan. Tambahkan id_mapel untuk validasi.
+const inputHafalanSchema = z.object({
+    id_mapel: z.number().int().positive(), // Field penting untuk validasi
+    tanggal_setoran: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal harus YYYY-MM-DD"),
+    hafalan_data: z.array(hafalanItemSchema).min(1, "Data hafalan tidak boleh kosong")
+});
+
 // Skema untuk satu item absensi
 const absensiItemSchema = z.object({
     id_santri: z.number().int().positive(),
@@ -56,7 +73,7 @@ export const getProfile = async (req: Request, res: Response) => {
     try {
         const query = `
             SELECT p.nama_lengkap, p.username, p.email, g.tempat_lahir, g.tanggal_lahir, 
-                   g.alamat, g.tahun_mengajar, g.pendidikan_tertinggi, g.jabatan
+                    g.alamat, g.tahun_mengajar, g.pendidikan_tertinggi, g.jabatan
             FROM guru g JOIN pengguna p ON g.id_pengguna = p.id WHERE p.id = ?`;
         const [guruProfile] = await pool.query<GuruProfile[]>(query, [id_pengguna]);
         
@@ -102,6 +119,87 @@ export const createAbsensi = async (req: Request, res: Response) => {
         if (connection) await connection.rollback();
         console.error("Error saat menyimpan absensi:", error);
         res.status(500).json({ success: false, error: "Gagal menyimpan data absensi." });
+    } finally {
+        if (connection) connection.release();
+    }
+};
+
+export const inputHafalan = async (req: Request, res: Response) => {
+    // 1. Validasi body request menggunakan skema Zod
+    const validationResult = inputHafalanSchema.safeParse(req.body);
+    if (!validationResult.success) {
+        return res.status(400).json({ 
+            success: false, 
+            error: "Data hafalan tidak valid", 
+            details: validationResult.error.flatten().fieldErrors 
+        });
+    }
+
+    // 2. Pastikan pengguna adalah guru dan sudah login
+    if (!req.session.user || req.session.user.peran !== 'Guru') {
+        return res.status(401).json({ success: false, error: "Akses ditolak. Anda harus login sebagai Guru." });
+    }
+    
+    const { id_pengguna } = req.session.user;
+    const { tanggal_setoran, hafalan_data, id_mapel } = validationResult.data;
+
+    let connection: PoolConnection | undefined;
+    try {
+        connection = await pool.getConnection();
+        if (!connection) {
+            return res.status(500).json({ success: false, error: "Gagal mendapatkan koneksi database." });
+        }
+
+        // 3. Dapatkan id_guru dari id_pengguna
+        const [guruData] = await connection.query<{ id: number }[] & RowDataPacket[]>('SELECT id FROM guru WHERE id_pengguna = ?', [id_pengguna]);
+        if (guruData.length === 0) {
+            return res.status(404).json({ success: false, error: "Data guru tidak ditemukan." });
+        }
+        const id_guru = guruData[0].id;
+
+        // 4. Validasi bahwa guru berwenang menginput hafalan berdasarkan kategori mapel
+        const [penugasanValid] = await connection.query<RowDataPacket[]>(`
+            SELECT jm.id
+            FROM jadwal_mengajar jm
+            JOIN mata_pelajaran mp ON jm.id_mapel = mp.id
+            WHERE jm.id_guru = ? AND mp.id = ? AND mp.kategori = 'Diniyah'
+        `, [id_guru, id_mapel]);
+
+        if (penugasanValid.length === 0) {
+            connection.release();
+            return res.status(403).json({ success: false, error: "Anda tidak berwenang menginput hafalan melalui mata pelajaran ini." });
+        }
+
+        await connection.beginTransaction();
+
+        // 5. Looping untuk menyimpan setiap data hafalan
+        for (const hafalan of hafalan_data) {
+            const sql = `
+                INSERT INTO progres_hafalan 
+                (id_santri, id_guru, tanggal_setoran, nama_juz_surah, ayat_awal, ayat_akhir, status_hafalan, catatan_guru) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE 
+                status_hafalan=VALUES(status_hafalan), catatan_guru=VALUES(catatan_guru)
+            `;
+            await connection.query(sql, [
+                hafalan.id_santri, 
+                id_guru, 
+                tanggal_setoran, 
+                hafalan.nama_juz_surah, 
+                hafalan.ayat_awal, 
+                hafalan.ayat_akhir, 
+                hafalan.status_hafalan, 
+                hafalan.catatan_guru
+            ]);
+        }
+        
+        await connection.commit();
+        res.status(201).json({ success: true, data: { message: "Data hafalan berhasil disimpan." } });
+
+    } catch (error: any) {
+        if (connection) await connection.rollback();
+        console.error("Error saat menyimpan hafalan:", error);
+        res.status(500).json({ success: false, error: "Gagal menyimpan data hafalan." });
     } finally {
         if (connection) connection.release();
     }
