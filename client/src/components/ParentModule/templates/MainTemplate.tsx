@@ -17,8 +17,6 @@ export const MainTemplate: React.FC<MainTemplateProps> = ({ children }) => {
   return (
     <div className="flex min-h-screen bg-gray-100">
       <Sidebar
-        currentPage={currentPage}
-        onPageChange={setCurrentPage}
         isOpen={isSidebarOpen}
         onToggle={toggleSidebar}
         userRole={user?.peran}

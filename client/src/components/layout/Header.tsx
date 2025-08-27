@@ -1,4 +1,3 @@
-import React from 'react';
 import { Bell, UserCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContexts'; // Import hook useAuth
 

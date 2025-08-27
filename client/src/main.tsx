@@ -5,6 +5,7 @@ import App from './App.tsx';
 import './index.css';
 import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContexts';
+import { PaymentDataProvider } from './contexts/PaymentDataContext';
 import axios from 'axios';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -17,8 +18,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        
-      <App />
+        <PaymentDataProvider>
+          <App />
+        </PaymentDataProvider>
       </AuthProvider>
       <ToastContainer position="bottom-right" autoClose={3000} hideProgressBar newestOnTop closeOnClick rtl={false} pauseOnFocusLoss draggable pauseOnHover />
     </BrowserRouter>

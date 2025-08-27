@@ -1,0 +1,11 @@
+export { AdminRoutes } from './AdminRoutes';
+export { DashboardAdminPage } from './pages/DashboardAdminPage';
+export { TeachersManagementPage } from './pages/TeachersManagementPage';
+export { StudentsManagementPage } from './pages/StudentsManagementPage';
+export { ClassManagementPage } from './pages/ClassManagementPage';
+export { AcademicManagementPage } from './pages/AcademicManagementPage';
+export { SettingsPage } from './pages/SettingsPage';
+export { AdminTemplate } from './templates/AdminTemplate';
+export { AdminSidebar } from './components/AdminSidebar';
+export { AdminHeader } from './components/AdminHeader';
+export type { AdminPage } from './components/AdminSidebar';
