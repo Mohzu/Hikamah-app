@@ -1,16 +1,7 @@
 import React, { useState } from 'react';
 import { BookOpen, Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
-import { useNavigate, Link } from 'react-router-dom';
-import { toast } from 'react-toastify'; // Pastikan Anda sudah menginstal react-toastify
-import axios from 'axios';
-
-interface User {
-  id: number;
-  username: string;
-  nama_lengkap: string;
-  peran: 'Admin' | 'Guru' | 'Santri' | 'Wali Santri';
-  status_aktif?: number;
-}
+import { Link } from 'react-router-dom';
+import { useAuth } from '../../../contexts/AuthContexts';
 
 export function LoginPage() {
   // Mengubah state dari 'email' menjadi 'username'
@@ -18,8 +9,7 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const navigate = useNavigate();
+  const { login, isLoading } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,56 +20,15 @@ export function LoginPage() {
       return;
     }
 
-    setIsLoading(true);
+    console.log('[LoginPage] Attempting login with username:', username);
+    
     try {
-  const response = await axios.post(`${import.meta.env.VITE_API_URL}/api/auth/login`, {
-    username,
-    kata_sandi: password,
-  }, {
-    withCredentials: true,
-  });
-
-  if (response.status === 200 && response.data.success) {
-    toast.success(response.data.data.message || 'Login berhasil!');
-
-    const user: User = response.data.data.user;
-
-    if (user) {
-      switch (user.peran) {
-        case 'Admin':
-          navigate('/parent/');
-          break;
-        case 'Guru':
-          navigate('/guru/dashboard');
-          break;
-        case 'Santri':
-          navigate('/parent/');
-          break;
-        case 'Wali Santri':
-          navigate('/parent/');
-          break;
-        default:
-          navigate('/dashboard');
-      }
+      await login(username, password);
+      console.log('[LoginPage] Login successful, should redirect now');
+    } catch (err: any) {
+      console.log('[LoginPage] Login failed:', err.message);
+      setError(err.message || 'Terjadi kesalahan. Silakan coba lagi.');
     }
-
-  } else {
-    setError(response.data.error || 'Respons login tidak valid.');
-    toast.error(response.data.error || 'Respons login tidak valid.');
-  }
-
-} catch (err) {
-  if (axios.isAxiosError(err) && err.response) {
-    setError(err.response.data.error || 'Username atau kata sandi salah.');
-    toast.error(err.response.data.error || 'Login gagal. Coba lagi.');
-  } else {
-    setError('Terjadi kesalahan. Silakan coba lagi.');
-    toast.error('Terjadi kesalahan. Silakan coba lagi.');
-  }
-} finally {
-  setIsLoading(false);
-}
-
   };
 
   return (

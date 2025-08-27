@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { Home, CreditCard, BookOpen, GraduationCap, User, LogOut, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContexts';
@@ -17,7 +17,7 @@ const menuItems = [
   { id: 'profile', label: 'Profil', icon: User, path: '/parent/profile' },
 ];
 
-export function Sidebar({ isOpen, onToggle, userRole }: SidebarProps) {
+export function Sidebar({ isOpen, onToggle }: SidebarProps) {
   const { logout, user } = useAuth();
 
   useEffect(() => {

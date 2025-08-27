@@ -1,5 +1,5 @@
 import React from 'react';
-import { Clock, CheckCircle, Award, BookOpen, ArrowRight, TrendingUp } from 'lucide-react';
+import { Clock, CheckCircle, BookOpen, ArrowRight, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom'; // Import useNavigate untuk navigasi
 
 interface DashboardSummaryProps {

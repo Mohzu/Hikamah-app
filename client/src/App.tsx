@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthRoutes } from './components/auth/AuthRoutes';
 import { ParentRoutes } from './components/ParentModule/parentroutes';
 import { MainTemplate } from './components/ParentModule/templates/MainTemplate';
 import { useAuth } from './contexts/AuthContexts';
 import { DashboardPage } from '../src/components/ParentModule/pages/DashboardPage';
+import { AdminRoutes } from './components/AdminModule/AdminRoutes';
 
 interface ProtectedRouteProps {
   isAllowed: boolean;
@@ -26,10 +27,15 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 function App() {
   const { isLoggedIn, user, isLoading } = useAuth();
 
-  if (isLoading) return <div>Loading...</div>;
+  useEffect(() => {
+    console.log("[App] isLoggedIn:", isLoggedIn);
+    console.log("[App] user:", user);
+    if (user?.peran === 'Admin') {
+      console.log("[App] Admin user detected, should be able to access /admin/* routes");
+    }
+  }, [isLoggedIn, user]);
 
-  console.log("[App] isLoggedIn:", isLoggedIn);
-  console.log("[App] user:", user);
+  if (isLoading) return <div>Loading...</div>;
 
   return (
     <Routes>
@@ -44,9 +50,7 @@ function App() {
         path="/admin/*"
         element={
           <ProtectedRoute isAllowed={isLoggedIn && user?.peran === "Admin"}>
-            <MainTemplate>
-              <div>Halaman Admin (nanti buat AdminRoutes)</div>
-            </MainTemplate>
+            <AdminRoutes />
           </ProtectedRoute>
         }
       />

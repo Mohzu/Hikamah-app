@@ -210,23 +210,7 @@ export const deleteJadwal = async (req: Request<{ id_jadwal: string }>, res: Res
 
 export const getAllJadwal = async (req: Request, res: Response) => {
     try {
-        const query = `
-            SELECT
-                jm.id AS id_jadwal,
-                jm.tahun_ajaran,
-                k.nama_kelas,
-                mp.nama_mapel,
-                p.nama_lengkap AS nama_guru,
-                jm.hari,
-                jm.waktu_mulai,
-                jm.waktu_selesai
-            FROM jadwal_mengajar jm
-            JOIN kelas k ON jm.id_kelas = k.id
-            JOIN mata_pelajaran mp ON jm.id_mapel = mp.id
-            JOIN guru g ON jm.id_guru = g.id
-            JOIN pengguna p ON g.id_pengguna = p.id
-            ORDER BY FIELD(jm.hari, 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'), jm.waktu_mulai ASC
-        `;
+        const query = "SELECT jm.id AS id_jadwal, jm.tahun_ajaran, k.nama_kelas, mp.nama_mapel, p.nama_lengkap AS nama_guru, jm.hari, jm.waktu_mulai, jm.waktu_selesai FROM jadwal_mengajar jm JOIN kelas k ON jm.id_kelas = k.id JOIN mata_pelajaran mp ON jm.id_mapel = mp.id JOIN guru g ON jm.id_guru = g.id JOIN pengguna p ON g.id_pengguna = p.id ORDER BY CASE jm.hari WHEN 'Senin' THEN 1 WHEN 'Selasa' THEN 2 WHEN 'Rabu' THEN 3 WHEN 'Kamis' THEN 4 WHEN 'Jumat' THEN 5 WHEN 'Sabtu' THEN 6 WHEN 'Minggu' THEN 7 ELSE 8 END, jm.waktu_mulai ASC";
         
         const [jadwalList] = await pool.query<JadwalDetailRow[]>(query);
         

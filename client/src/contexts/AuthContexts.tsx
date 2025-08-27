@@ -8,6 +8,7 @@ interface User {
   username: string;
   nama_santri?: string;
   nama_pengguna?: string;
+  email?: string;
   peran: 'Admin' | 'Guru' | 'Santri' | 'Wali Santri';
   id_santri?: number;
 }
@@ -51,17 +52,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (response.data.success) {
         setUser(response.data.data.user);
         toast.success(response.data.data.message || 'Login berhasil!');
-        if (response.data.data.user.peran === 'Santri') {
-          navigate('/parent/dashboard');
-        } else {
-          navigate('/dashboard');
+        
+        console.log('[AuthContext] User role:', response.data.data.user.peran);
+        console.log('[AuthContext] Redirecting user...');
+        
+        // Redirect based on user role
+        switch (response.data.data.user.peran) {
+          case 'Admin':
+            console.log('[AuthContext] Redirecting to admin dashboard');
+            navigate('/admin/dashboard');
+            break;
+          case 'Guru':
+            console.log('[AuthContext] Redirecting to guru dashboard');
+            navigate('/guru/dashboard');
+            break;
+          case 'Santri':
+            console.log('[AuthContext] Redirecting to parent dashboard');
+            navigate('/parent/dashboard');
+            break;
+          case 'Wali Santri':
+            console.log('[AuthContext] Redirecting to parent dashboard');
+            navigate('/parent/dashboard');
+            break;
+          default:
+            console.log('[AuthContext] Redirecting to default dashboard');
+            navigate('/dashboard');
         }
       } else {
-        toast.error(response.data.error || 'Login gagal.');
+        const errorMessage = response.data.error || 'Login gagal.';
+        toast.error(errorMessage);
+        throw new Error(errorMessage);
       }
     } catch (error: any) {
       console.error("Login gagal:", error);
-      toast.error(error.response?.data?.error || 'Login gagal. Coba lagi.');
+      const errorMessage = error.response?.data?.error || 'Login gagal. Coba lagi.';
+      toast.error(errorMessage);
+      throw new Error(errorMessage);
     } finally {
       setIsLoading(false);
     }
