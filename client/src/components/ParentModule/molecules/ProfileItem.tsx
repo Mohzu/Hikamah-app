@@ -1,3 +1,4 @@
+// client/src/components/ParentModule/molecules/ProfileItem.tsx
 import React from 'react';
 
 interface ProfileItemProps {

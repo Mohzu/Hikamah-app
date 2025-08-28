@@ -1,11 +1,14 @@
+// client/src/App.tsx
+
 import React, { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthRoutes } from './components/auth/AuthRoutes';
 import { ParentRoutes } from './components/ParentModule/parentroutes';
 import { MainTemplate } from './components/ParentModule/templates/MainTemplate';
 import { useAuth } from './contexts/AuthContexts';
-import { DashboardPage } from '../src/components/ParentModule/pages/DashboardPage';
+import { DashboardPage } from './components/ParentModule/pages/DashboardPage';
 import { AdminRoutes } from './components/AdminModule/AdminRoutes';
+import { StudentDataProvider } from './contexts/StudentDataContext';
 
 interface ProtectedRouteProps {
   isAllowed: boolean;
@@ -39,13 +42,8 @@ function App() {
 
   return (
     <Routes>
-      {/* Default redirect ke login */}
       <Route path="/" element={<Navigate to="/auth/login" replace />} />
-
-      {/* Auth */}
       <Route path="/auth/*" element={<AuthRoutes />} />
-
-      {/* Admin */}
       <Route
         path="/admin/*"
         element={
@@ -54,8 +52,6 @@ function App() {
           </ProtectedRoute>
         }
       />
-
-      {/* Guru */}
       <Route
         path="/guru/*"
         element={
@@ -66,24 +62,22 @@ function App() {
           </ProtectedRoute>
         }
       />
-
-      {/* Santri / Parent */}
       <Route
         path="/parent/*"
         element={
-          <ProtectedRoute isAllowed={isLoggedIn && user?.peran === "Santri"}>
-            <MainTemplate>
-              <Routes>
-                <Route path="dashboard" element={<DashboardPage />} />
-                {/* Rute lain untuk parent */}
-                <Route path="*" element={<ParentRoutes />} />
-              </Routes>
-            </MainTemplate>
+          <ProtectedRoute isAllowed={isLoggedIn && (user?.peran === "Santri" || user?.peran === "Wali Santri")}>
+            {/* Perbaikan: StudentDataProvider membungkus MainTemplate */}
+            <StudentDataProvider>
+              <MainTemplate>
+                <Routes>
+                  <Route path="dashboard" element={<DashboardPage />} />
+                  <Route path="*" element={<ParentRoutes />} />
+                </Routes>
+              </MainTemplate>
+            </StudentDataProvider>
           </ProtectedRoute>
         }
       />
-
-      {/* Fallback */}
       <Route path="*" element={<Navigate to="/auth/login" replace />} />
     </Routes>
   );

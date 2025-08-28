@@ -1,6 +1,4 @@
 // --- IMPORTS ---
-
-// --- IMPORTS ---
 import express, { Router, Request } from 'express';
 import path from 'path';
 import multer, { FileFilterCallback } from 'multer';
@@ -18,9 +16,9 @@ import {
     getJadwalPelajaran,
     getSantriDashboardSummary,
     getAvailableRaporPeriods,
-} from '../controllers/santriController.js'; // Perhatikan tidak ada ".js" di sini
+    getAvailableAcademicYears // Tambahkan ini
+} from '../controllers/santriController.js';
 
-// Buat instance router
 const router: Router = express.Router();
 
 
@@ -29,13 +27,9 @@ const router: Router = express.Router();
 // 1. Definisikan aturan penyimpanan (di mana & bagaimana file disimpan)
 const storage = multer.diskStorage({
     destination: (req: Request, file: Express.Multer.File, cb: (error: Error | null, destination: string) => void) => {
-        // PENJELASAN: 'public/uploads/' adalah path relatif dari root proyek server Anda.
-        // Anda harus membuat folder 'public' dan di dalamnya folder 'uploads' secara manual.
         cb(null, 'public/uploads/');
     },
     filename: (req: Request, file: Express.Multer.File, cb: (error: Error | null, filename: string) => void) => {
-        // PENJELASAN: Membuat nama file unik untuk mencegah nama yang sama saling menimpa.
-        // Contoh: santri-167888999123.jpg
         cb(null, `santri-${Date.now()}${path.extname(file.originalname)}`);
     }
 });
@@ -47,10 +41,8 @@ const fileFilter = (req: Request, file: Express.Multer.File, cb: FileFilterCallb
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
 
     if (mimetype && extname) {
-        // Jika tipe file sesuai, terima file dengan `cb(null, true)`
         return cb(null, true);
     }
-    // Jika tipe file tidak sesuai, tolak file dengan mengirimkan Error
     cb(new Error('Tipe file tidak didukung. Hanya gambar (jpeg, jpg, png, gif) yang diizinkan.'));
 };
 
@@ -58,7 +50,7 @@ const fileFilter = (req: Request, file: Express.Multer.File, cb: FileFilterCallb
 const upload = multer({ 
     storage: storage,
     fileFilter: fileFilter,
-    limits: { fileSize: 1024 * 1024 * 2 } // Batas ukuran file 2MB
+    limits: { fileSize: 1024 * 1024 * 2 }
 });
 
 
@@ -66,8 +58,6 @@ const upload = multer({
 // === ROUTE DEFINITIONS (DEFINISIKAN SEMUA RUTE DI SINI) ===
 // =======================================================================
 
-// Terapkan middleware 'isSantri' ke semua rute di bawah ini.
-// Ini memastikan hanya santri yang sudah login yang bisa mengakses endpoint ini.
 router.use(isSantri);
 
 // Rute untuk manajemen akun
@@ -78,8 +68,7 @@ router.put('/change-username', changeUsername);
 router.get('/profile', getFullProfile);
 router.put('/update-biodata', updateBiodata);
 
-// Rute untuk upload foto. Perhatikan `upload.single('profilePhoto')` disisipkan
-// sebagai middleware SEBELUM controller `uploadPhoto` dijalankan.
+// Rute untuk upload foto
 router.post('/upload-photo', upload.single('profilePhoto'), uploadPhoto);
 
 // Rute untuk melihat data akademik
@@ -88,6 +77,7 @@ router.get('/my-nilai', getMyNilai);
 router.get('/rapor', getRaporSemester);
 router.get("/hafalan", getMyHafalan);
 router.get("/available-rapor-periods", isSantri, getAvailableRaporPeriods);
+router.get("/available-academic-years", getAvailableAcademicYears); // Tambahkan rute baru ini
 
 // Rute baru untuk ringkasan dashboard santri
 router.get('/dashboard-summary', getSantriDashboardSummary);

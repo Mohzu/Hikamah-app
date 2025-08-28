@@ -1,4 +1,4 @@
-// src/index.ts
+// server/src/index.ts
 
 // --- IMPORTS ---
 import express, { Express, Request, Response } from 'express';
@@ -7,8 +7,15 @@ import session from 'express-session';
 import MySQLStoreFactory from 'express-mysql-session';
 import dotenv from 'dotenv';
 import { Store } from 'express-session';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// Konfigurasi dotenv tanpa __dirname
+// Tambahkan ini untuk mendapatkan path direktori
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const rootPath = path.resolve(__dirname, '..');
+
+// Konfigurasi dotenv
 dotenv.config();
 
 // --- INISIALISASI APLIKASI EXPRESS ---
@@ -46,6 +53,10 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// BARIS PENTING: Tambahkan middleware untuk melayani file statis dari folder 'public'
+app.use(express.static(path.join(rootPath, 'public')));
+console.log('Serving static files from:', path.join(rootPath, 'public'));
 
 // --- KONFIGURASI SESI DENGAN LOG ---
 const MySQLStore = MySQLStoreFactory(session as any);
