@@ -53,6 +53,8 @@ interface SantriDataRow extends RowDataPacket {
   alamat: string;
   foto_profil: string;
   email_wali: string | null;
+  nama_kelas?: string;
+  nama_jenjang?: string;
 }
 interface OrangTuaDataRow extends RowDataPacket {
   status_hubungan: "Ayah" | "Ibu";
@@ -99,7 +101,6 @@ const raporQuerySchema = z.object({
   semester: z.enum(["Ganjil", "Genap"]),
 });
 
-// Tambahkan skema ini di bagian "INTERFACES & TYPES & SKEMA ZOD"
 const jadwalQuerySchema = z.object({
   tahun_ajaran: z
     .string()
@@ -244,7 +245,6 @@ export const uploadPhoto = async (req: Request, res: Response) => {
       [id_santri]
     );
     if (oldData.length > 0 && oldData[0].foto_profil) {
-      // --- PERBAIKAN DI SINI ---
       const oldPhotoPath = path.join(
         __dirname,
         "../public",
@@ -260,11 +260,11 @@ export const uploadPhoto = async (req: Request, res: Response) => {
           console.error("Gagal menghapus foto lama:", err);
         }
       }
-    } // 4. Update database dengan path foto baru
+    }
     const [result] = await pool.query<OkPacket>(
       "UPDATE santri SET foto_profil = ? WHERE id = ?",
       [newPhotoUrl, id_santri]
-    ); // 5. Log hasil query
+    );
 
     console.log("Hasil update database:", result);
 
@@ -293,7 +293,6 @@ export const uploadPhoto = async (req: Request, res: Response) => {
 };
 
 export const updateBiodata = async (req: Request, res: Response) => {
-  // 1. Validasi input body terlebih dahulu
   const validation = updateBiodataSchema.safeParse(req.body);
   if (!validation.success) {
     return res.status(400).json({
@@ -304,7 +303,6 @@ export const updateBiodata = async (req: Request, res: Response) => {
   }
 
   try {
-    // 2. Verifikasi sesi dan ambil id_santri LANGSUNG dari sesi
     if (!req.session.user || !req.session.user.id_santri) {
       console.error(
         "[DEBUG] GAGAL: Sesi pengguna atau id_santri tidak ditemukan di updateBiodata."
@@ -316,11 +314,10 @@ export const updateBiodata = async (req: Request, res: Response) => {
     const id_santri = req.session.user.id_santri;
     console.log(
       `[DEBUG] updateBiodata dipanggil untuk id_santri dari SESI: ${id_santri}`
-    ); // 3. Gunakan data yang sudah divalidasi oleh Zod
+    );
 
     const fieldsToUpdate = validation.data;
-
-    const updateKeys = Object.keys(fieldsToUpdate); // Cek jika tidak ada data yang dikirim (meskipun Zod sudah menangani ini dengan .refine)
+    const updateKeys = Object.keys(fieldsToUpdate);
 
     if (updateKeys.length === 0) {
       return res.status(400).json({
@@ -344,7 +341,6 @@ export const updateBiodata = async (req: Request, res: Response) => {
     );
 
     if (result.affectedRows === 0) {
-      // Cek apakah santri memang tidak ada
       const [santriCheck] = await pool.query<RowDataPacket[]>(
         "SELECT id FROM santri WHERE id = ?",
         [id_santri]
@@ -357,7 +353,6 @@ export const updateBiodata = async (req: Request, res: Response) => {
           .status(404)
           .json({ success: false, error: `Santri tidak ditemukan.` });
       } else {
-        // Jika santri ada, berarti data yang dikirim sama
         return res.status(200).json({
           success: true,
           data: {
@@ -382,7 +377,6 @@ export const updateBiodata = async (req: Request, res: Response) => {
 
 export const getFullProfile = async (req: Request, res: Response) => {
   try {
-    // 1. Verifikasi sesi sekali lagi di dalam controller
     if (!req.session.user || !req.session.user.id_santri) {
       console.error(
         "[DEBUG] GAGAL: Sesi pengguna atau id_santri tidak ditemukan di getFullProfile."
@@ -390,15 +384,30 @@ export const getFullProfile = async (req: Request, res: Response) => {
       return res
         .status(401)
         .json({ success: false, error: "Sesi tidak valid." });
-    } // 2. Ambil id_santri LANGSUNG dari sesi
+    }
 
     const id_santri = req.session.user.id_santri;
+    const tahun_ajaran_sekarang = new Date().getFullYear().toString();
     console.log(
       `[DEBUG] getFullProfile dipanggil untuk id_santri dari SESI: ${id_santri}`
-    ); // 3. Gunakan LEFT JOIN untuk keamanan, seperti sebelumnya
-
-    const querySantri = `SELECT s.nama_lengkap, s.nomor_induk, s.nisn, s.tempat_lahir, s.tanggal_lahir, s.jenis_kelamin, s.anak_ke, s.dari_bersaudara, s.agama, s.alamat, s.foto_profil, p_wali.email AS email_wali FROM santri s LEFT JOIN pengguna p_wali ON s.id_wali = p_wali.id WHERE s.id = ?`;
+    );
+    
+    // Perbaikan: Menambahkan LEFT JOIN untuk mendapatkan nama_kelas dan nama_jenjang
+    const querySantri = `
+      SELECT 
+          s.id AS id_santri, s.nama_lengkap, s.nomor_induk, s.nisn, s.tempat_lahir, 
+          s.tanggal_lahir, s.jenis_kelamin, s.anak_ke, s.dari_bersaudara, s.agama, s.alamat, 
+          s.foto_profil, p_wali.email AS email_wali,
+          k.nama_kelas, jp.nama_jenjang
+      FROM santri s
+      LEFT JOIN pengguna p_wali ON s.id_wali = p_wali.id
+      LEFT JOIN santri_kelas sk ON s.id = sk.id_santri AND sk.tahun_ajaran = ?
+      LEFT JOIN kelas k ON sk.id_kelas = k.id
+      LEFT JOIN jenjang_pendidikan jp ON k.id_jenjang = jp.id
+      WHERE s.id = ?
+    `;
     const [santriData] = await pool.query<SantriDataRow[]>(querySantri, [
+      `${tahun_ajaran_sekarang}/${parseInt(tahun_ajaran_sekarang) + 1}`,
       id_santri,
     ]);
 
@@ -414,7 +423,7 @@ export const getFullProfile = async (req: Request, res: Response) => {
     }
 
     const [orangTuaData] = await pool.query<OrangTuaDataRow[]>(
-      "SELECT * FROM orang_tua WHERE id_santri = ?",
+      "SELECT nama_lengkap, tempat_lahir, tanggal_lahir, pekerjaan, pendidikan_terakhir, alamat, nomor_hp, status_hubungan FROM orang_tua WHERE id_santri = ?",
       [id_santri]
     );
 
@@ -426,25 +435,15 @@ export const getFullProfile = async (req: Request, res: Response) => {
     const ibuData = orangTuaData.find((ortu) => ortu.status_hubungan === "Ibu");
 
     const fullProfile = {
-      santri: santriData[0],
-      ayah: {
-        nama_lengkap: ayahData?.nama_lengkap,
-        tempat_lahir: ayahData?.tempat_lahir,
-        tanggal_lahir: ayahData?.tanggal_lahir,
-        pekerjaan: ayahData?.pekerjaan,
-        pendidikan_terakhir: ayahData?.pendidikan_terakhir,
-        alamat: ayahData?.alamat,
-        nomor_hp: ayahData?.nomor_hp,
+      santri: {
+        ...santriData[0],
+        id_santri: santriData[0].id_santri, // Memastikan id_santri ada
+        nama_kelas: santriData[0].nama_kelas || null,
+        nama_jenjang: santriData[0].nama_jenjang || null,
+        tanggal_lahir: santriData[0].tanggal_lahir.toISOString(),
       },
-      ibu: {
-        nama_lengkap: ibuData?.nama_lengkap,
-        tempat_lahir: ibuData?.tempat_lahir,
-        tanggal_lahir: ibuData?.tanggal_lahir,
-        pekerjaan: ibuData?.pekerjaan,
-        pendidikan_terakhir: ibuData?.pendidikan_terakhir,
-        alamat: ibuData?.alamat,
-        nomor_hp: ibuData?.nomor_hp,
-      },
+      ayah: ayahData || null,
+      ibu: ibuData || null,
     };
 
     res.status(200).json({ success: true, data: fullProfile });
@@ -461,10 +460,6 @@ export const getJadwalPelajaran = async (
   req: RequestWithSantri,
   res: Response
 ) => {
-  // Validasi input
-  console.log(
-    `[DEBUG] Controller getJadwalPelajaran: Menerima request untuk ID Santri: ${req.id_santri}`
-  );
   const validation = jadwalQuerySchema.safeParse(req.query);
   if (!validation.success) {
     return res.status(400).json({
@@ -478,7 +473,6 @@ export const getJadwalPelajaran = async (
   const { tahun_ajaran } = validation.data;
 
   try {
-    // Query untuk mendapatkan ID kelas santri di tahun ajaran tertentu
     const [kelasSantri] = await pool.query<
       { id_kelas: number }[] & RowDataPacket[]
     >(
@@ -494,10 +488,9 @@ export const getJadwalPelajaran = async (
       });
     }
 
-    const id_kelas = kelasSantri[0].id_kelas; // Query untuk mendapatkan jadwal pelajaran berdasarkan ID kelas
-
-    const queryJadwal = `SELECT jm.hari, jm.waktu_mulai, jm.waktu_selesai, mp.nama_mapel, p.nama_lengkap AS nama_guru FROM jadwal_mengajar jm JOIN mata_pelajaran mp ON jm.id_mapel = mp.id JOIN guru g ON jm.id_guru = g.id JOIN pengguna p ON g.id_pengguna = p.id WHERE jm.id_kelas = ? ORDER BY FIELD(jm.hari, 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'), jm.waktu_mulai ASC`;
-    const [jadwal] = await pool.query<RowDataPacket[]>(queryJadwal, [id_kelas]); // Pengelompokan jadwal berdasarkan hari
+    const id_kelas = kelasSantri[0].id_kelas;
+    const queryJadwal = `SELECT jm.hari, jm.waktu_mulai, jm.waktu_selesai, mp.nama_mapel, p.nama_lengkap AS nama_guru FROM jadwal_mengajar jm JOIN mata_pelajaran mp ON jm.id_mapel = mp.id JOIN guru g ON jm.id_guru = g.id JOIN pengguna p ON g.id_pengguna = p.id WHERE jm.id_kelas = ? AND jm.tahun_ajaran = ? ORDER BY FIELD(jm.hari, 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'), jm.waktu_mulai ASC`;
+    const [jadwal] = await pool.query<RowDataPacket[]>(queryJadwal, [id_kelas, tahun_ajaran]);
 
     const groupedJadwal = jadwal.reduce((acc, item) => {
       const hari = item.hari;
@@ -533,6 +526,7 @@ export const getJadwalPelajaran = async (
   }
 };
 
+
 export const getMyNilai = async (req: RequestWithSantri, res: Response) => {
   const id_santri = req.id_santri!;
   try {
@@ -543,7 +537,7 @@ export const getMyNilai = async (req: RequestWithSantri, res: Response) => {
     WHERE n.id_santri = ?
     ORDER BY n.tahun_ajaran DESC, n.semester DESC, mp.nama_mapel ASC
     `;
-    const [nilaiList] = await pool.query<NilaiRow[]>(query, [id_santri]); // Logika pengelompokan Anda sudah benar
+    const [nilaiList] = await pool.query<NilaiRow[]>(query, [id_santri]);
 
     const groupedNilai = nilaiList.reduce((acc, nilai) => {
       const key = `${nilai.tahun_ajaran} - Semester ${nilai.semester}`;
@@ -602,7 +596,7 @@ WHERE id_santri = ? AND tahun_ajaran = ? GROUP BY status`,
     const [catatanPerilaku] = await pool.query<RowDataPacket[]>(
       "SELECT kategori, deskripsi, tanggal_catatan FROM catatan_perilaku WHERE id_santri = ? AND tahun_ajaran = ? AND semester = ? ORDER BY tanggal_catatan DESC",
       [id_santri, tahun_ajaran, semester]
-    ); // Semua logika penyusunan rapor Anda di bawah ini sudah benar
+    );
 
     const absensi = { Hadir: 0, Sakit: 0, Izin: 0, Alfa: 0 };
     rekapAbsensi.forEach((item) => {
@@ -773,7 +767,7 @@ export const getSantriDashboardSummary = async (
     const totalTerbayar = pembayaranData[0].total_terbayar
       ? parseFloat(pembayaranData[0].total_terbayar)
       : 0;
-    const sisaTagihan = 13300000 - totalTerbayar; // Mengambil data hafalan (asumsi 'nama_juz_surah' berisi angka juz, misal '3 Juz')
+    const sisaTagihan = 13300000 - totalTerbayar;
 
     const [hafalanData] = await pool.query<RowDataPacket[]>(
       "SELECT nama_juz_surah FROM progres_hafalan WHERE id_santri = ? ORDER BY tanggal_setoran DESC LIMIT 1",
@@ -800,4 +794,18 @@ export const getSantriDashboardSummary = async (
       error: "Gagal mengambil data dashboard summary.",
     });
   }
+};
+// Tambahkan fungsi baru untuk mengambil semua tahun ajaran yang tersedia
+export const getAvailableAcademicYears = async (req: RequestWithSantri, res: Response) => {
+    const id_santri = req.id_santri!;
+    try {
+        const [years] = await pool.query<RowDataPacket[]>(
+            `SELECT DISTINCT tahun_ajaran FROM santri_kelas WHERE id_santri = ? ORDER BY tahun_ajaran DESC`,
+            [id_santri]
+        );
+        res.status(200).json({ success: true, data: years.map(y => y.tahun_ajaran) });
+    } catch (error: any) {
+        console.error("Error fetching available academic years:", error);
+        res.status(500).json({ success: false, error: "Gagal mengambil daftar tahun ajaran." });
+    }
 };

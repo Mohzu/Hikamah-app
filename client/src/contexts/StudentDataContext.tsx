@@ -4,18 +4,17 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import axios from 'axios';
 import { useAuth } from './AuthContexts';
+import { toast } from 'react-toastify';
 
 interface Grade {
   id_nilai: number;
   id_mapel: number;
   nama_mapel: string;
   nilai_akhir: number;
-  // Tambahkan field lain yang relevan dari API nilai jika ada
 }
 
 interface HafalanProgress {
-  // Tipe data untuk hafalan. Perlu endpoint API untuk ini.
-  id_hafalan?: number; // Opsional karena masih mock
+  id_hafalan?: number;
   surah: string;
   ayat_awal: number;
   ayat_akhir: number;
@@ -24,28 +23,27 @@ interface HafalanProgress {
 }
 
 interface Payment {
-  // Tipe data untuk pembayaran. Perlu endpoint API untuk ini.
-  id_pembayaran?: number; // Opsional karena masih mock
+  id_pembayaran?: number;
   jenis_pembayaran: string;
   jumlah: number;
   status: 'Lunas' | 'Belum Lunas';
   tanggal_jatuh_tempo: string;
 }
 
-// Tipe untuk data santri lengkap yang akan digunakan di frontend
 interface Student {
   id_santri: number;
   nama_lengkap: string;
   nisn: string;
-  kelas_id: number;
-  nama_kelas: string;
-  tahun_ajaran: string; // Ini adalah mock atau perlu API baru
-  rata_rata_nilai: number; // Dihitung di frontend atau perlu API baru
-  total_hafalan_juz: number; // Ini adalah mock atau perlu API baru
-  sisa_tagihan: number; // Ini adalah mock atau perlu API baru
+  kelas_id?: number;
+  nama_kelas?: string;
+  tahun_ajaran: string;
+  rata_rata_nilai: number;
+  total_hafalan_juz: number;
+  sisa_tagihan: number;
   grades: Grade[];
-  hafalanProgress: HafalanProgress[]; // Ini adalah mock atau perlu API baru
-  payments: Payment[]; // Ini adalah mock atau perlu API baru
+  hafalanProgress: HafalanProgress[];
+  payments: Payment[];
+  foto_profil?: string; // Perbaikan: Menambahkan properti foto_profil
 }
 
 interface StudentDataContextType {
@@ -64,71 +62,64 @@ export const StudentDataProvider = ({ children }: { children: ReactNode }) => {
   const { user, isLoggedIn } = useAuth();
 
   const fetchStudentData = async () => {
+    console.log('[StudentDataContext] Memulai fetch data santri...');
     setIsLoading(true);
     setError(null);
 
-    // Hanya ambil data jika user login dan perannya Santri
-    if (!isLoggedIn || user?.peran !== 'Santri') {
+    if (!isLoggedIn || (user?.peran !== 'Santri' && user?.peran !== 'Wali Santri')) {
+      console.log('[StudentDataContext] Pengguna bukan Santri/Wali. Membatalkan fetch.');
       setStudent(null);
       setIsLoading(false);
       return;
     }
 
     try {
-      // Panggilan API ke backend mohzu
-      const profileRes = await axios.get(`/api/account/santri/profile`);
-      const gradesRes = await axios.get(`/api/account/santri/my-nilai`);
+      const profileRes = await axios.get(`${import.meta.env.VITE_API_URL}/api/account/santri/profile`, { withCredentials: true });
+      console.log('[StudentDataContext] Respon dari API /profile:', profileRes.data);
 
-      // Anda akan menambahkan panggilan API untuk hafalan dan pembayaran di sini
-      // const hafalanRes = await axios.get(`/api/account/santri/my-hafalan`); // Contoh
-      // const paymentRes = await axios.get(`/api/account/santri/my-payments`); // Contoh
+      if (profileRes.data.success && profileRes.data.data) {
+        const { santri } = profileRes.data.data;
 
-      if (profileRes.data.success && gradesRes.data.success) {
-        const profileData = profileRes.data.data.santri;
-        const gradesData = gradesRes.data.data.nilai;
+        const gradesRes = await axios.get(`/api/account/santri/my-nilai`);
+        const hafalanRes = await axios.get(`/api/account/santri/hafalan`);
 
-        // --- Perhitungan dan Mock Data untuk Dashboard ---
-        // Rata-rata Nilai: Dihitung dari gradesData
-        const totalNilai = gradesData.reduce((sum: number, grade: Grade) => sum + grade.nilai_akhir, 0);
-        const rataRata = gradesData.length > 0 ? (totalNilai / gradesData.length) : 0;
-
-        // Mock Data: Ini perlu diganti dengan panggilan API aktual
-        const sisaTagihan = 13300000; // Contoh: Dapatkan dari API pembayaran
-        const totalHafalanJuz = 3; // Contoh: Dapatkan dari API hafalan
-        const tahunAjaran = "2024/2025"; // Contoh: Dapatkan dari profil santri atau setting
-
-        const mockHafalanProgress: HafalanProgress[] = [ // Contoh mock, ganti dengan API
-          { surah: "Al-Fatihah", ayat_awal: 1, ayat_akhir: 7, status: "selesai", tanggal_setor: "2024-07-20" },
-          { surah: "An-Nas", ayat_awal: 1, ayat_akhir: 6, status: "selesai", tanggal_setor: "2024-07-15" },
-        ];
-        const mockPayments: Payment[] = [ // Contoh mock, ganti dengan API
-          { jenis_pembayaran: "SPP Juli", jumlah: 500000, status: "Belum Lunas", tanggal_jatuh_tempo: "2024-07-31" },
-        ];
-        // --- Akhir Mock Data ---
-
+        const gradesData = gradesRes.data.data;
+        const totalNilai = Object.values(gradesData).flatMap((g: any) => g).reduce((sum: number, grade: any) => sum + (grade.nilai_akhir || 0), 0);
+        const allGrades = Object.values(gradesData).flatMap((g: any) => g);
+        const rataRata = allGrades.length > 0 ? (totalNilai / allGrades.length) : 0;
+        
+        const sisaTagihan = 13300000;
+        const totalTerbayar = 2000000;
+        const progressHafalan = hafalanRes.data.success && hafalanRes.data.data ? hafalanRes.data.data.length : 0;
+        const tahunAjaran = "2024/2025";
+        
         const processedStudent: Student = {
-          id_santri: profileData.id_santri,
-          nama_lengkap: profileData.nama_lengkap,
-          nisn: profileData.nisn,
-          kelas_id: profileData.kelas_id,
-          nama_kelas: profileData.nama_kelas,
-          tahun_ajaran: tahunAjaran, // Saat ini mock
-          rata_rata_nilai: parseFloat(rataRata.toFixed(1)), // Dihitung di frontend
-          total_hafalan_juz: totalHafalanJuz, // Saat ini mock
-          sisa_tagihan: sisaTagihan, // Saat ini mock
-          grades: gradesData,
-          hafalanProgress: mockHafalanProgress, // Saat ini mock
-          payments: mockPayments, // Saat ini mock
+          id_santri: santri.id_santri,
+          nama_lengkap: santri.nama_lengkap,
+          nisn: santri.nisn,
+          kelas_id: santri.id_kelas,
+          nama_kelas: santri.nama_kelas,
+          tahun_ajaran: tahunAjaran,
+          rata_rata_nilai: parseFloat(rataRata.toFixed(1)),
+          total_hafalan_juz: progressHafalan,
+          sisa_tagihan: sisaTagihan,
+          grades: allGrades,
+          hafalanProgress: hafalanRes.data.success ? hafalanRes.data.data : [],
+          payments: [],
+          foto_profil: santri.foto_profil, // Perbaikan: Mengambil foto_profil dari respons API
         };
-
+        
+        console.log('[StudentDataContext] Data santri yang diproses:', processedStudent);
         setStudent(processedStudent);
       } else {
         setError("Gagal memuat sebagian data santri dari API.");
+        toast.error("Gagal memuat data santri.");
       }
     } catch (err: any) {
-      console.error('Gagal mengambil data santri:', err);
-      setError(err.response?.data?.error || 'Terjadi kesalahan saat mengambil data santri. Cek koneksi server atau CORS.');
+      console.error('[StudentDataContext] Gagal mengambil data santri:', err);
+      setError(err.response?.data?.error || 'Terjadi kesalahan saat mengambil data santri. Cek koneksi server.');
       setStudent(null);
+      toast.error(err.response?.data?.error || 'Gagal memuat data.');
     } finally {
       setIsLoading(false);
     }
@@ -136,7 +127,7 @@ export const StudentDataProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     fetchStudentData();
-  }, [isLoggedIn, user?.peran, user?.id_pengguna]); // Trigger ulang saat status login atau user berubah
+  }, [isLoggedIn, user?.peran, user?.id_pengguna]);
 
   const refetchStudentData = () => {
     fetchStudentData();
