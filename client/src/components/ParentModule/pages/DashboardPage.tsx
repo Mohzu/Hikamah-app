@@ -58,7 +58,9 @@ export function DashboardPage() {
         }
 
         if (yearsResponse.data.success && yearsResponse.data.data.length > 0) {
-          const years = yearsResponse.data.data;
+          const periods = yearsResponse.data.data;
+          // Extract unique years from periods
+          const years = Array.from(new Set(periods.map((p: any) => p.tahun_ajaran))) as string[];
           setAvailableYears(years);
           setSelectedYear(years[0]);
         }
@@ -148,20 +150,28 @@ export function DashboardPage() {
         <div className="p-4 text-center text-red-500">{error}</div>
       ) : (
         <>
-          {dashboardData && (
+          {dashboardData ? (
             <DashboardSummary
               sisaTagihan={dashboardData.sisa_tagihan}
               totalTerbayar={dashboardData.total_terbayar}
               rataRataNilai={dashboardData.rata_rata_nilai}
               progressHafalan={dashboardData.progress_hafalan}
             />
+          ) : (
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <p className="text-center text-gray-500">Data dashboard tidak tersedia</p>
+            </div>
           )}
 
-          {scheduleData && (
+          {scheduleData && Object.keys(scheduleData).length > 0 ? (
             <ScheduleTable
               jadwal={scheduleData}
               tahunAjaran={selectedYear}
             />
+          ) : (
+            <div className="bg-white rounded-xl shadow-lg p-6">
+              <p className="text-center text-gray-500">Jadwal tidak tersedia untuk tahun ajaran {selectedYear}</p>
+            </div>
           )}
         </>
       )}

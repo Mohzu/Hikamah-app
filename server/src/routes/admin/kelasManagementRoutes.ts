@@ -1,5 +1,5 @@
 import express, { Router } from 'express';
-import { isAdmin } from '../middleware/authMiddleware.js';
+import { isAdmin } from '../../middleware/authMiddleware.js';
 import {
     createKelas,
     assignWaliKelas,
@@ -7,7 +7,7 @@ import {
     assignSantriToKelas,
     removeSantriFromKelas,
     deleteKelas
-} from '../controllers/kelasManagementController.js';
+} from '../../controllers/admin/kelasManagementController.js';
 
 const router: Router = express.Router();
 

@@ -7,8 +7,7 @@ interface SidebarProps {
   isOpen: boolean;
   onToggle: () => void;
   userRole?: string;
-}
-
+}
 const menuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: Home, path: '/parent/dashboard' },
   { id: 'payment', label: 'Pembayaran', icon: CreditCard, path: '/parent/payment' },

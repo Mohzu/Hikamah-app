@@ -1,220 +1,242 @@
-// --- IMPORTS ---
+// src/controllers/authController.ts
+
 import { Request, Response } from 'express';
 import pool from '../config/db.js';
 import bcrypt from 'bcryptjs';
 import { RowDataPacket, OkPacket, PoolConnection } from 'mysql2/promise';
 import { z } from 'zod';
 
-// --- INTERFACES & SKEMA ZOD ---
-
-// Tipe data dari database (tetap berguna)
+// Tipe data dari database
 interface UserRow extends RowDataPacket {
-    id: number;
-    kata_sandi: string;
-    status_aktif: number;
-    peran: 'Admin' | 'Guru' | 'Santri' | 'Wali Santri';
-    nama_lengkap: string;
-    username: string;
+    id: number;
+    kata_sandi: string;
+    status_aktif: number;
+    peran: 'Admin' | 'Guru' | 'Santri' | 'Wali Santri' | 'Bendahara';
+    nama_lengkap: string;
+    username: string;
 }
 interface SantriRow extends RowDataPacket {
+    id: number;
+    nama_lengkap: string;
+}
+interface GuruRow extends RowDataPacket {
     id: number;
-    nama_lengkap: string;
+    jabatan: string;
 }
 
-// Skema untuk Login
 const loginSchema = z.object({
-    username: z.string().min(1, "Username harus diisi"),
-    kata_sandi: z.string().min(1, "Kata sandi harus diisi")
+    username: z.string().min(1, "Username harus diisi"),
+    kata_sandi: z.string().min(1, "Kata sandi harus diisi")
 });
 
-// Skema untuk Pendaftaran
 const registerSchema = z.object({
-    // Data Santri
     nomor_induk: z.string().length(13, "Nomor Induk harus 13 digit").regex(/^\d+$/, "Nomor Induk hanya boleh berisi angka"),
-    nama_santri: z.string().min(3, "Nama santri harus diisi"),
-    tempat_lahir_santri: z.string().min(1, "Tempat lahir santri harus diisi"),
-    tanggal_lahir_santri: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal lahir harus YYYY-MM-DD"),
-    jenis_kelamin: z.enum(['L', 'P']),
-    anak_ke: z.number().int().positive(),
-    dari_bersaudara: z.number().int().positive(),
-    agama: z.string().min(1, "Agama harus diisi"),
-    alamat_santri: z.string().min(1, "Alamat santri harus diisi"),
-    
-    // Data Orang Tua (dibuat opsional dengan default string kosong)
-    nama_ayah: z.string().default(''), tempat_lahir_ayah: z.string().default(''), tanggal_lahir_ayah: z.string().default(''),
-    pekerjaan_ayah: z.string().default(''), pendidikan_ayah: z.string().default(''), alamat_ayah: z.string().default(''), nomor_hp_ayah: z.string().default(''),
-    nama_ibu: z.string().default(''), tempat_lahir_ibu: z.string().default(''), tanggal_lahir_ibu: z.string().default(''),
-    pekerjaan_ibu: z.string().default(''), pendidikan_ibu: z.string().default(''), alamat_ibu: z.string().default(''), nomor_hp_ibu: z.string().default(''),
-    
-    // Data Akun Wali
-    email_wali: z.string().email("Format email wali tidak valid"),
-    hubungan_wali: z.enum(['Ayah', 'Ibu'])
+    nama_santri: z.string().min(3, "Nama santri harus diisi"),
+    tempat_lahir_santri: z.string().min(1, "Tempat lahir santri harus diisi"),
+    tanggal_lahir_santri: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal lahir harus YYYY-MM-DD"),
+    jenis_kelamin: z.enum(['L', 'P']),
+    anak_ke: z.number().int().positive(),
+    dari_bersaudara: z.number().int().positive(),
+    agama: z.string().min(1, "Agama harus diisi"),
+    alamat_santri: z.string().min(1, "Alamat santri harus diisi"),
+    nama_ayah: z.string().default(''), tempat_lahir_ayah: z.string().default(''), tanggal_lahir_ayah: z.string().default(''),
+    pekerjaan_ayah: z.string().default(''), pendidikan_ayah: z.string().default(''), alamat_ayah: z.string().default(''), nomor_hp_ayah: z.string().default(''),
+    nama_ibu: z.string().default(''), tempat_lahir_ibu: z.string().default(''), tanggal_lahir_ibu: z.string().default(''),
+    pekerjaan_ibu: z.string().default(''), pendidikan_ibu: z.string().default(''), alamat_ibu: z.string().default(''), nomor_hp_ibu: z.string().default(''),
+    email_wali: z.string().email("Format email wali tidak valid"),
+    hubungan_wali: z.enum(['Ayah', 'Ibu'])
 });
-
-// --- FUNGSI CONTROLLER ---
 
 export const register = async (req: Request, res: Response) => {
-    const validationResult = registerSchema.safeParse(req.body);
-    if (!validationResult.success) {
-        return res.status(400).json({ success: false, error: "Data pendaftaran tidak valid", details: validationResult.error.flatten().fieldErrors });
-    }
-    
-    const { 
-        nomor_induk, nama_santri, tanggal_lahir_santri, email_wali, hubungan_wali, 
-        nama_ayah, tempat_lahir_ayah, tanggal_lahir_ayah, pekerjaan_ayah, pendidikan_ayah, alamat_ayah, nomor_hp_ayah,
-        nama_ibu, tempat_lahir_ibu, tanggal_lahir_ibu, pekerjaan_ibu, pendidikan_ibu, alamat_ibu, nomor_hp_ibu,
-        ...dataLainnya 
-    } = validationResult.data;
+    const validationResult = registerSchema.safeParse(req.body);
+    if (!validationResult.success) {
+        return res.status(400).json({ success: false, error: "Data pendaftaran tidak valid", details: validationResult.error.flatten().fieldErrors });
+    }
+    
+    const { 
+        nomor_induk, nama_santri, tanggal_lahir_santri, email_wali, hubungan_wali, 
+        nama_ayah, tempat_lahir_ayah, tanggal_lahir_ayah, pekerjaan_ayah, pendidikan_ayah, alamat_ayah, nomor_hp_ayah,
+        nama_ibu, tempat_lahir_ibu, tanggal_lahir_ibu, pekerjaan_ibu, pendidikan_ibu, alamat_ibu, nomor_hp_ibu,
+        ...dataLainnya 
+    } = validationResult.data;
 
-    let connection: PoolConnection | undefined; 
-    try {
-        connection = await pool.getConnection();
-        if (!connection) throw new Error('Gagal mendapatkan koneksi database.');
-        await connection.beginTransaction();
+    let connection: PoolConnection | undefined; 
+    try {
+        connection = await pool.getConnection();
+        if (!connection) throw new Error('Gagal mendapatkan koneksi database.');
+        await connection.beginTransaction();
 
-        const [emailCheck] = await connection.query<RowDataPacket[]>('SELECT id FROM pengguna WHERE email = ?', [email_wali]);
-        if (emailCheck.length > 0) throw new Error('Email wali ini sudah terdaftar.');
-        
-        const [indukCheck] = await connection.query<RowDataPacket[]>('SELECT id FROM santri WHERE nomor_induk = ?', [nomor_induk]);
-        if (indukCheck.length > 0) throw new Error('Nomor Induk ini sudah terdaftar.');
+        const [emailCheck] = await connection.query<RowDataPacket[]>('SELECT id FROM pengguna WHERE email = ?', [email_wali]);
+        if (emailCheck.length > 0) throw new Error('Email wali ini sudah terdaftar.');
+        
+        const [indukCheck] = await connection.query<RowDataPacket[]>('SELECT id FROM santri WHERE nomor_induk = ?', [nomor_induk]);
+        if (indukCheck.length > 0) throw new Error('Nomor Induk ini sudah terdaftar.');
 
-        const nama_wali_akun = hubungan_wali.toLowerCase() === 'ayah' ? nama_ayah : nama_ibu;
-        const nomor_hp_wali_akun = hubungan_wali.toLowerCase() === 'ayah' ? nomor_hp_ayah : nomor_hp_ibu;
-        
-        const tempPassword = tanggal_lahir_santri.replace(/-/g, '');
-        const hashedPassword = await bcrypt.hash(tempPassword, 10);
-        
-        const [resultWali] = await connection.query<OkPacket>('INSERT INTO pengguna (nama_lengkap, email, kata_sandi, nomor_hp, peran, status_aktif) VALUES (?, ?, ?, ?, ?, ?)', [nama_wali_akun, email_wali, hashedPassword, nomor_hp_wali_akun, 'Wali Santri', false]);
-        const idWaliPengguna = resultWali.insertId;
+        const nama_wali_akun = hubungan_wali.toLowerCase() === 'ayah' ? nama_ayah : nama_ibu;
+        const nomor_hp_wali_akun = hubungan_wali.toLowerCase() === 'ayah' ? nomor_hp_ayah : nomor_hp_ibu;
+        
+        const tempPassword = tanggal_lahir_santri.replace(/-/g, '');
+        const hashedPassword = await bcrypt.hash(tempPassword, 10);
+        
+        const [resultWali] = await connection.query<OkPacket>('INSERT INTO pengguna (nama_lengkap, email, kata_sandi, nomor_hp, peran, status_aktif) VALUES (?, ?, ?, ?, ?, ?)', [nama_wali_akun, email_wali, hashedPassword, nomor_hp_wali_akun, 'Wali Santri', false]);
+        const idWaliPengguna = resultWali.insertId;
 
-        const [resultSantri] = await connection.query<OkPacket>('INSERT INTO santri (id_wali, nomor_induk, nama_lengkap, tempat_lahir, tanggal_lahir, jenis_kelamin, anak_ke, dari_bersaudara, agama, alamat, tanggal_daftar) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [idWaliPengguna, nomor_induk, nama_santri, dataLainnya.tempat_lahir_santri, tanggal_lahir_santri, dataLainnya.jenis_kelamin, dataLainnya.anak_ke, dataLainnya.dari_bersaudara, dataLainnya.agama, dataLainnya.alamat_santri, new Date()]);
-        const idSantri = resultSantri.insertId;
-        
-        await connection.query('INSERT INTO orang_tua (id_santri, status_hubungan, nama_lengkap, tempat_lahir, tanggal_lahir, pekerjaan, pendidikan_terakhir, alamat, nomor_hp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [idSantri, 'Ayah', nama_ayah, tempat_lahir_ayah, tanggal_lahir_ayah, pekerjaan_ayah, pendidikan_ayah, alamat_ayah, nomor_hp_ayah]);
-        await connection.query('INSERT INTO orang_tua (id_santri, status_hubungan, nama_lengkap, tempat_lahir, tanggal_lahir, pekerjaan, pendidikan_terakhir, alamat, nomor_hp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [idSantri, 'Ibu', nama_ibu, tempat_lahir_ibu, tanggal_lahir_ibu, pekerjaan_ibu, pendidikan_ibu, alamat_ibu, nomor_hp_ibu]);
-        
-        await connection.commit();
-        res.status(201).json({ success: true, data: { message: 'Pendaftaran berhasil. Data Anda akan diverifikasi oleh admin.' } });
+        const [resultSantri] = await connection.query<OkPacket>('INSERT INTO santri (id_wali, nomor_induk, nama_lengkap, tempat_lahir, tanggal_lahir, jenis_kelamin, anak_ke, dari_bersaudara, agama, alamat, tanggal_daftar) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [idWaliPengguna, nomor_induk, nama_santri, dataLainnya.tempat_lahir_santri, tanggal_lahir_santri, dataLainnya.jenis_kelamin, dataLainnya.anak_ke, dataLainnya.dari_bersaudara, dataLainnya.agama, dataLainnya.alamat_santri, new Date()]);
+        const idSantri = resultSantri.insertId;
+        
+        await connection.query('INSERT INTO orang_tua (id_santri, status_hubungan, nama_lengkap, tempat_lahir, tanggal_lahir, pekerjaan, pendidikan_terakhir, alamat, nomor_hp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [idSantri, 'Ayah', nama_ayah, tempat_lahir_ayah, tanggal_lahir_ayah, pekerjaan_ayah, pendidikan_ayah, alamat_ayah, nomor_hp_ayah]);
+        await connection.query('INSERT INTO orang_tua (id_santri, status_hubungan, nama_lengkap, tempat_lahir, tanggal_lahir, pekerjaan, pendidikan_terakhir, alamat, nomor_hp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [idSantri, 'Ibu', nama_ibu, tempat_lahir_ibu, tanggal_lahir_ibu, pekerjaan_ibu, pendidikan_ibu, alamat_ibu, nomor_hp_ibu]);
+        
+        await connection.commit();
+        res.status(201).json({ success: true, data: { message: 'Pendaftaran berhasil. Data Anda akan diverifikasi oleh admin.' } });
 
-    } catch (error: any) {
-        if (connection) await connection.rollback();
-        console.error('Ada error saat pendaftaran:', error);
-        
-        if (error.message.includes('terdaftar')) {
-            res.status(409).json({ success: false, error: error.message });
-        } else {
-            res.status(500).json({ success: false, error: 'Pendaftaran gagal karena kesalahan server.' });
-        }
-    } finally {
-        if (connection) connection.release();
-    }
+    } catch (error: any) {
+        if (connection) await connection.rollback();
+        console.error('Ada error saat pendaftaran:', error);
+        
+        if (error.message.includes('terdaftar')) {
+            res.status(409).json({ success: false, error: error.message });
+        } else {
+            res.status(500).json({ success: false, error: 'Pendaftaran gagal karena kesalahan server.' });
+        }
+    } finally {
+        if (connection) connection.release();
+    }
 };
 
 export const login = async (req: Request, res: Response) => {
-    console.log("[LOGIN CONTROLLER] 1. Fungsi login dimulai.");
-    
-    const validationResult = loginSchema.safeParse(req.body);
-    if (!validationResult.success) {
-        console.log("[LOGIN CONTROLLER] GAGAL: Validasi Zod gagal.");
-        return res.status(400).json({ success: false, error: "Data login tidak valid", details: validationResult.error.flatten().fieldErrors });
-    }
+    console.log("[LOGIN CONTROLLER] 1. Fungsi login dimulai.");
+    
+    const validationResult = loginSchema.safeParse(req.body);
+    if (!validationResult.success) {
+        console.log("[LOGIN CONTROLLER] GAGAL: Validasi Zod gagal.");
+        return res.status(400).json({ success: false, error: "Data login tidak valid", details: validationResult.error.flatten().fieldErrors });
+    }
 
-    console.log("[LOGIN CONTROLLER] 2. Validasi Zod berhasil.");
-    const { username, kata_sandi } = validationResult.data;
+    console.log("[LOGIN CONTROLLER] 2. Validasi Zod berhasil.");
+    const { username, kata_sandi } = validationResult.data;
 
-    try {
-        console.log(`[LOGIN CONTROLLER] 3. Mencoba mengambil pengguna dari DB: ${username}`);
-        
-        const [users] = await pool.query<UserRow[]>('SELECT id, kata_sandi, status_aktif, peran, nama_lengkap, username FROM pengguna WHERE username = ?', [username]);
-        
-        console.log("[LOGIN CONTROLLER] 4. Query pengguna selesai. Ditemukan:", users.length);
+    try {
+        console.log(`[LOGIN CONTROLLER] 3. Mencoba mengambil pengguna dari DB: ${username}`);
+        
+        const [users] = await pool.query<UserRow[]>('SELECT id, kata_sandi, status_aktif, peran, nama_lengkap, username FROM pengguna WHERE username = ?', [username]);
+        
+        console.log("[LOGIN CONTROLLER] 4. Query pengguna selesai. Ditemukan:", users.length);
 
-        if (users.length === 0) {
-            console.log("[LOGIN CONTROLLER] GAGAL: Pengguna tidak ditemukan.");
-            return res.status(401).json({ success: false, error: 'Username atau kata sandi salah.' });
-        }
-        
-        const user = users[0];
-        console.log("[LOGIN CONTROLLER] 5. Mencocokkan password...");
-        
-        const isMatch = await bcrypt.compare(kata_sandi, user.kata_sandi);
-        console.log("[LOGIN CONTROLLER] 6. Pencocokan password selesai. Hasil:", isMatch);
+        if (users.length === 0) {
+            console.log("[LOGIN CONTROLLER] GAGAL: Pengguna tidak ditemukan.");
+            return res.status(401).json({ success: false, error: 'Username atau kata sandi salah.' });
+        }
+        
+        const user = users[0];
+        console.log("[LOGIN CONTROLLER] 5. Mencocokkan password...");
+        
+        const isMatch = await bcrypt.compare(kata_sandi, user.kata_sandi);
+        console.log("[LOGIN CONTROLLER] 6. Pencocokan password selesai. Hasil:", isMatch);
 
-        if (!isMatch) {
-            console.log("[LOGIN CONTROLLER] GAGAL: Password tidak cocok.");
-            return res.status(401).json({ success: false, error: 'Username atau kata sandi salah.' });
-        }
+        if (!isMatch) {
+            console.log("[LOGIN CONTROLLER] GAGAL: Password tidak cocok.");
+            return res.status(401).json({ success: false, error: 'Username atau kata sandi salah.' });
+        }
 
-        if (user.status_aktif !== 1) {
-            console.log("[LOGIN CONTROLLER] GAGAL: Akun tidak aktif.");
-            return res.status(403).json({ success: false, error: 'Akun ini tidak aktif.' });
-        }
-        
-        console.log("[LOGIN CONTROLLER] 7. Login berhasil. Mempersiapkan sesi...");
-        let sessionPayload;
-        const userRole = user.peran.toLowerCase();
+        // PERBAIKAN: Check status aktif
+        if (user.status_aktif !== 1) {
+            console.log("[LOGIN CONTROLLER] GAGAL: Akun tidak aktif.");
+            return res.status(403).json({ success: false, error: 'Akun ini tidak aktif.' });
+        }
+        
+        console.log("[LOGIN CONTROLLER] 7. Login berhasil. Mempersiapkan sesi...");
+        let sessionPayload;
+        const userRole = user.peran.toLowerCase();
 
-        if (userRole === 'santri') {
-            const [santriRows] = await pool.query<SantriRow[]>('SELECT id, nama_lengkap FROM santri WHERE id_pengguna = ?', [user.id]);
-            if (santriRows.length === 0) {
-                console.log("[LOGIN CONTROLLER] GAGAL: Akun santri tidak tertaut.");
-                return res.status(403).json({ success: false, error: 'Akun Pengguna Santri tidak tertaut.' });
-            }
-            sessionPayload = {
-                id_pengguna: user.id, username: user.username, nama_santri: santriRows[0].nama_lengkap,
-                peran: user.peran as 'Santri', id_santri: santriRows[0].id
-            };
-        } else if (userRole === 'admin' || userRole === 'guru') {
-            sessionPayload = {
-                id_pengguna: user.id, username: user.username, nama_pengguna: user.nama_lengkap,
-                peran: user.peran as 'Admin' | 'Guru'
-            };
-        } else {
-            console.log(`[LOGIN CONTROLLER] GAGAL: Peran tidak valid: ${user.peran}`);
-            return res.status(403).json({ success: false, error: 'Peran pengguna tidak valid untuk login.' });
-        }
+        if (userRole === 'santri') {
+            const tahun_ajaran_sekarang = new Date().getFullYear().toString();
+            const [santriRows] = await pool.query<SantriRow[]>(
+                `SELECT s.id, s.nama_lengkap, k.nama_kelas, jp.nama_jenjang
+                FROM santri s
+                LEFT JOIN santri_kelas sk ON s.id = sk.id_santri AND sk.tahun_ajaran = ?
+                LEFT JOIN kelas k ON sk.id_kelas = k.id
+                LEFT JOIN jenjang_pendidikan jp ON k.id_jenjang = jp.id
+                WHERE s.id_pengguna = ?`,
+                [`${tahun_ajaran_sekarang}/${parseInt(tahun_ajaran_sekarang) + 1}`,
+                user.id]
+            );
+            if (santriRows.length === 0) {
+                console.log("[LOGIN CONTROLLER] GAGAL: Akun santri tidak tertaut.");
+                return res.status(403).json({ success: false, error: 'Akun Pengguna Santri tidak tertaut.' });
+            }
+            sessionPayload = {
+                id_pengguna: user.id, username: user.username, nama_santri: santriRows[0].nama_lengkap,
+                peran: user.peran as 'Santri', id_santri: santriRows[0].id,
+                nama_kelas: santriRows[0].nama_kelas || null,
+                nama_jenjang: santriRows[0].nama_jenjang || null,
+            };
+        } else if (userRole === 'admin') {
+            sessionPayload = {
+                id_pengguna: user.id, username: user.username, nama_pengguna: user.nama_lengkap,
+                peran: user.peran as 'Admin'
+            };
+        } else if (userRole === 'guru') {
+            // Logika guru
+            const [guruRows] = await pool.query<GuruRow[]>('SELECT id, jabatan FROM guru WHERE id_pengguna = ?', [user.id]);
+            if (guruRows.length === 0) {
+                return res.status(403).json({ success: false, error: 'Akun Guru tidak tertaut.' });
+            }
+            sessionPayload = {
+                id_pengguna: user.id, username: user.username, nama_pengguna: user.nama_lengkap,
+                peran: user.peran as 'Guru', id_guru: guruRows[0].id, jabatan: guruRows[0].jabatan
+            };
+        } else if (userRole === 'bendahara') {
+            sessionPayload = {
+                id_pengguna: user.id, username: user.username, nama_pengguna: user.nama_lengkap,
+                peran: user.peran as 'Bendahara'
+            };
+        } else {
+            console.log(`[LOGIN CONTROLLER] GAGAL: Peran tidak valid: ${user.peran}`);
+            return res.status(403).json({ success: false, error: 'Peran pengguna tidak valid untuk login.' });
+        }
 
-        console.log("[LOGIN CONTROLLER] 8. Mencoba regenerate sesi...");
-        req.session.regenerate(err => {
-            if (err) {
-                console.error("[LOGIN CONTROLLER] GAGAL: req.session.regenerate gagal", err);
-                return res.status(500).json({ success: false, error: 'Gagal memulai sesi.' });
-            }
-            
-            console.log("[LOGIN CONTROLLER] 9. Regenerate sesi berhasil. Menyimpan sesi...");
-            req.session.user = sessionPayload;
-            req.session.save(err => {
-                if (err) {
-                    console.error("[LOGIN CONTROLLER] GAGAL: req.session.save gagal", err);
-                    return res.status(500).json({ success: false, error: 'Login gagal.' });
-                }
-                
-                console.log("[LOGIN CONTROLLER] 10. Sesi berhasil disimpan. Mengirim respons.");
-                res.status(200).json({ success: true, data: { message: 'Login berhasil.', user: sessionPayload } });
-            });
-        });
+        console.log("[LOGIN CONTROLLER] 8. Mencoba regenerate sesi...");
+        req.session.regenerate(err => {
+            if (err) {
+                console.error("[LOGIN CONTROLLER] GAGAL: req.session.regenerate gagal", err);
+                return res.status(500).json({ success: false, error: 'Gagal memulai sesi.' });
+            }
+            
+            console.log("[LOGIN CONTROLLER] 9. Regenerate sesi berhasil. Menyimpan sesi...");
+            req.session.user = sessionPayload;
+            req.session.save(err => {
+                if (err) {
+                    console.error("[LOGIN CONTROLLER] GAGAL: req.session.save gagal", err);
+                    return res.status(500).json({ success: false, error: 'Login gagal.' });
+                }
+                
+                console.log("[LOGIN CONTROLLER] 10. Sesi berhasil disimpan. Mengirim respons.");
+                res.status(200).json({ success: true, data: { message: 'Login berhasil.', user: sessionPayload } });
+            });
+        });
 
-    } catch (error: any) {
-        console.error("[LOGIN CONTROLLER] !!! TERJADI ERROR DI CATCH BLOCK:", error);
-        res.status(500).json({ success: false, error: 'Login gagal karena kesalahan server.' });
-    }
+    } catch (error: any) {
+        console.error("[LOGIN CONTROLLER] !!! TERJADI ERROR DI CATCH BLOCK:", error);
+        res.status(500).json({ success: false, error: 'Login gagal karena kesalahan server.' });
+    }
 };
 
 export const getLoginStatus = (req: Request, res: Response) => {
-    if (req.session.user) {
-        res.status(200).json({ success: true, data: { loggedIn: true, user: req.session.user } });
-    } else {
-        res.status(200).json({ success: true, data: { loggedIn: false } });
-    }
+    if (req.session.user) {
+        res.status(200).json({ success: true, data: { loggedIn: true, user: req.session.user } });
+    } else {
+        res.status(200).json({ success: true, data: { loggedIn: false } });
+    }
 };
 
 export const logout = (req: Request, res: Response) => {
-    req.session.destroy(err => {
-        if (err) {
-            console.error("Gagal menghancurkan sesi:", err);
-            return res.status(500).json({ success: false, error: 'Gagal logout.' });
-        }
-        res.clearCookie('connect.sid');
-        res.status(200).json({ success: true, data: { message: 'Logout berhasil.' } });
-    });
+    req.session.destroy(err => {
+        if (err) {
+            console.error("Gagal menghancurkan sesi:", err);
+            return res.status(500).json({ success: false, error: 'Gagal logout.' });
+        }
+        res.clearCookie('connect.sid');
+        res.status(200).json({ success: true, data: { message: 'Logout berhasil.' } });
+    });
 };
