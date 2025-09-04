@@ -202,31 +202,55 @@ export function ProfilePage() {
     }
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return;
-    const file = e.target.files[0];
-    const formData = new FormData();
-    formData.append('profilePhoto', file);
-    setIsSubmitting(true);
-    try {
-      const response = await axios.post(
-        `${import.meta.env.VITE_API_URL}/api/account/santri/upload-photo`,
-        formData,
-        { withCredentials: true, headers: { 'Content-Type': 'multipart/form-data' } }
-      );
-      if (response.data.success) {
-        toast.success('Foto profil berhasil diunggah.');
-        fetchProfile();
-      } else {
-        toast.error(response.data.error || 'Gagal mengunggah foto.');
-      }
-    } catch (err: any) {
-      console.error('Error saat upload foto:', err);
-      toast.error(err.response?.data?.error || 'Gagal mengunggah foto.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    
+    // Validasi file
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Ukuran file terlalu besar. Maksimal 2MB.');
+      return;
+    }
+    
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Tipe file tidak didukung. Hanya JPG, PNG, dan GIF yang diizinkan.');
+      return;
+    }
+    
+    const formData = new FormData();
+    formData.append('profilePhoto', file);
+    setIsSubmitting(true);
+    
+    console.log('Uploading file:', {
+      name: file.name,
+      size: file.size,
+      type: file.type
+    });
+    
+    try {
+      const response = await axios.post(
+        `${import.meta.env.VITE_API_URL}/api/account/santri/upload-photo`,
+        formData,
+        { withCredentials: true, headers: { 'Content-Type': 'multipart/form-data' } }
+      );
+      
+      console.log('Upload response:', response.data);
+      
+      if (response.data.success) {
+        toast.success('Foto profil berhasil diunggah.');
+        fetchProfile();
+      } else {
+        toast.error(response.data.error || 'Gagal mengunggah foto.');
+      }
+    } catch (err: any) {
+      console.error('Error saat upload foto:', err);
+      console.error('Error response:', err.response?.data);
+      toast.error(err.response?.data?.error || 'Gagal mengunggah foto.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
   
   if (isLoading) {
     return (
@@ -385,7 +409,6 @@ export function ProfilePage() {
                       value={accountForm.newUsername}
                       onChange={(e) => setAccountForm({ ...accountForm, newUsername: e.target.value })}
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-gray-500 focus:border-transparent transition-all shadow-sm bg-white"
-                      placeholder="Masukkan username baru"
                       required
                     />
                   </div>
@@ -529,7 +552,6 @@ export function ProfilePage() {
                     value={editableBiodata.nama_lengkap}
                     onChange={(e) => setEditableBiodata({ ...editableBiodata, nama_lengkap: e.target.value })}
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all bg-white shadow-sm"
-                    placeholder="Masukkan nama lengkap"
                   />
                 </div>
                 <div className="space-y-2">
@@ -628,6 +650,6 @@ export function ProfilePage() {
           {ibu && <ProfileSection title="Data Ibu" data={ibu} iconColor="bg-gradient-to-r from-pink-500 to-rose-500" bgGradient="from-white to-pink-50" />}
         </div>
       </div>
-    </div>
+      </div>
   );
 }

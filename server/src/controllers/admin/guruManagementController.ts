@@ -1,6 +1,6 @@
 // --- IMPORTS ---
 import { Request, Response } from 'express';
-import pool from '../config/db.js';
+import pool from '../../config/db.js';
 import bcrypt from 'bcryptjs';
 import { RowDataPacket, OkPacket, PoolConnection } from 'mysql2/promise';
 import { z } from 'zod'; // Impor Zod

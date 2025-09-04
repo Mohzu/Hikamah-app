@@ -24,14 +24,16 @@ const PORT = process.env.PORT || 5000;
 
 // --- IMPOR RUTE ---
 import authRoutes from './routes/authRoutes.js';
-import adminRoutes from './routes/adminRoutes.js';
-import akademikRoutes from './routes/akademikRoutes.js';
+import adminAccountRoutes from './routes/admin/adminRoutes.js';
+import bendaharaManagementRoutes from './routes/admin/bendaharaManagementRoutes.js'; 
+import akademikManagementRoutes from './routes/admin/akademikRoutes.js';
 import guruRoutes from './routes/guruRoutes.js';
-import guruManagementRoutes from './routes/guruManagementRoutes.js';
-import kelasManagementRoutes from './routes/kelasManagementRoutes.js';
+import guruManagementRoutes from './routes/admin/guruManagementRoutes.js';
+import kelasManagementRoutes from './routes/admin/kelasManagementRoutes.js';
 import santriRoutes from './routes/santriRoutes.js';
-import santriManagementRoutes from './routes/santriManagementRoutes.js';
+import santriManagementRoutes from './routes/admin/santriManagementRoutes.js';
 import waliKelasRoutes from './routes/walikelasRoutes.js';
+import bendaharaRoutes from './routes/bendaharaRoutes.js'; // Rute baru untuk Bendahara
 
 // --- TES KONEKSI DATABASE SAAT STARTUP ---
 import pool from './config/db.js';
@@ -55,8 +57,9 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // BARIS PENTING: Tambahkan middleware untuk melayani file statis dari folder 'public'
-app.use(express.static(path.join(rootPath, 'public')));
-console.log('Serving static files from:', path.join(rootPath, 'public'));
+app.use('/public/uploads', express.static(path.join(rootPath, 'public/uploads')));
+app.use('/uploads', express.static(path.join(rootPath, 'public/uploads')));
+console.log('Serving static files from:', path.join(rootPath, 'public/uploads'));
 
 // --- KONFIGURASI SESI DENGAN LOG ---
 const MySQLStore = MySQLStoreFactory(session as any);
@@ -81,11 +84,17 @@ app.use(session(sessionConfig) as any);
 
 // --- GUNAKAN RUTE ---
 app.use('/api/auth', authRoutes);
-app.use('/api/account/admin', adminRoutes);
+app.use('/api/account/admin', adminAccountRoutes);
 app.use('/api/account/guru', guruRoutes);
 app.use('/api/account/santri', santriRoutes);
 app.use('/api/account/wali-kelas', waliKelasRoutes);
-app.use('/api/manage/akademik', akademikRoutes);
+
+// Rute khusus Bendahara
+app.use('/api/bendahara', bendaharaRoutes);
+
+// Rute Admin
+app.use('/api/admin/bendahara', bendaharaManagementRoutes);
+app.use('/api/manage/akademik', akademikManagementRoutes);
 app.use('/api/manage/guru', guruManagementRoutes);
 app.use('/api/manage/kelas', kelasManagementRoutes);
 app.use('/api/manage/santri', santriManagementRoutes);

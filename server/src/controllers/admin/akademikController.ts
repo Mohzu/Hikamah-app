@@ -1,6 +1,6 @@
 // --- IMPORTS ---
 import { Request, Response } from 'express';
-import pool from '../config/db.js';
+import pool from '../../config/db.js';
 import { RowDataPacket, OkPacket, ResultSetHeader } from 'mysql2/promise';
 import { z } from 'zod';
 

@@ -2,9 +2,11 @@
 import { SessionData } from 'express-session';
 
 interface UserSessionData {
+    id_guru: any;
+    jabatan: string;
     id_pengguna: number;
     username: string;
-    peran: 'Admin' | 'Guru' | 'Santri' | 'Wali Santri';
+    peran: 'Admin' | 'Guru' | 'Santri' | 'Wali Santri' | 'Bendahara';
     nama_pengguna?: string;
     nama_santri?: string;
     id_santri?: number;
