@@ -289,6 +289,8 @@ export function AcademicManagementPage() {
           waktu_selesai: ''
         });
         fetchSchedules();
+        // --- KIRIM SINYAL --- 
+        window.dispatchEvent(new Event('schedule-updated'));
       }
     } catch (error: any) {
       console.error('Error adding schedule:', error);
@@ -308,6 +310,8 @@ export function AcademicManagementPage() {
       if (response.data.success) {
         toast.success(response.data.data.message);
         fetchSchedules();
+        // --- KIRIM SINYAL --- 
+        window.dispatchEvent(new Event('schedule-updated'));
       }
     } catch (error: any) {
       console.error('Error deleting schedule:', error);

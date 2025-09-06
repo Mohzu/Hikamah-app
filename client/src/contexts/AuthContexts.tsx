@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 
+// --- INTERFACE DIPERBARUI ---
 interface User {
   id_pengguna: number;
   username: string;
@@ -11,6 +12,8 @@ interface User {
   email?: string;
   peran: 'Admin' | 'Guru' | 'Santri' | 'Wali Santri';
   id_santri?: number;
+  nama_kelas?: string | null; // Ditambahkan
+  nama_jenjang?: string | null; // Ditambahkan
 }
 
 interface AuthContextType {

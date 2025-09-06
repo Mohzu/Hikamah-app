@@ -3,6 +3,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { GradesPage } from './pages/GradesPage';
 import { HafalanPage } from './pages/HafalanPage';
 import { ProfilePage } from './pages/ProfilePage';
+import PaymentPage from './pages/PaymentPage';
 
 export function ParentRoutes() {
   return (
@@ -12,6 +13,7 @@ export function ParentRoutes() {
       <Route path="grades" element={<GradesPage />} />
       <Route path="hafalan" element={<HafalanPage />} />
       <Route path="profile" element={<ProfilePage />} />
+      <Route path="payment" element={<PaymentPage />} />
     </Routes>
   );
 }

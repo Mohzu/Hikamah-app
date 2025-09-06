@@ -9,13 +9,17 @@ import {
     getAllJadwal,
     updateGuruOnJadwal,
     deleteJadwal,
-    updateJadwalMengajar
+    updateJadwalMengajar,
+    getAllJenjang // <-- Impor fungsi baru
 } from '../../controllers/admin/akademikController.js';
 
 const router: Router = express.Router();
 
 // Semua rute di sini hanya bisa diakses oleh Admin
 router.use(isAdmin);
+
+// === Rute Manajemen Jenjang ===
+router.get('/jenjang', getAllJenjang); // <-- Rute baru
 
 // === Rute Manajemen Mata Pelajaran ===
 router.post('/mapel', createMapel);

@@ -227,6 +227,7 @@ export const getAllWaliKelas = async (req: Request, res: Response) => {
             acc[jenjang].push({
                 id_kelas: item.id_kelas,
                 nama_kelas: item.nama_kelas,
+                nama_jenjang: item.nama_jenjang, // <-- PERBAIKAN DI SINI
                 id_guru: item.id_guru,
                 nama_wali_kelas: item.nama_wali_kelas
             });

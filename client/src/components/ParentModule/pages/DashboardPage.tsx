@@ -1,22 +1,22 @@
 // client/src/components/ParentModule/pages/DashboardPage.tsx
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react"; // Import useCallback
 import axios from "axios";
 import { DashboardSummary } from "../organisms/DashboardSummary";
-import { Calendar, BookOpen, Loader2, ChevronDown } from "lucide-react";
+import { Calendar, BookOpen, Loader2, ChevronDown, UserSquare } from "lucide-react";
 import { useAuth } from "../../../contexts/AuthContexts";
 import { toast } from 'react-toastify';
 import { ScheduleTable } from "../organisms/ScheduleTable";
 
-// Interface untuk data yang diterima dari API dashboard
+// --- INTERFACES ---
 interface FetchedDashboardData {
   sisa_tagihan: number;
   total_terbayar: number;
   rata_rata_nilai: number;
   progress_hafalan: number;
+  nama_wali_kelas: string | null;
 }
 
-// Interface untuk data jadwal
 interface JadwalPelajaran {
   [hari: string]: {
     mata_pelajaran: string;
@@ -33,6 +33,25 @@ export function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [availableYears, setAvailableYears] = useState<string[]>([]);
   const [selectedYear, setSelectedYear] = useState<string>('');
+
+  // --- FUNGSI FETCH JADWAL --- 
+  // Dibuat sebagai fungsi terpisah agar bisa dipanggil ulang
+  const fetchScheduleForYear = useCallback(async (year: string) => {
+    if (!year) return;
+    try {
+      const scheduleResponse = await axios.get(`${import.meta.env.VITE_API_URL}/api/account/santri/jadwal?tahun_ajaran=${year}`, { withCredentials: true });
+      if (scheduleResponse.data.success) {
+        setScheduleData(scheduleResponse.data.data.jadwal);
+      } else {
+        setScheduleData({});
+        toast.info(scheduleResponse.data.error || `Jadwal tidak tersedia untuk tahun ajaran ${year}.`);
+      }
+    } catch (err: any) {
+      setScheduleData({});
+      console.error("[DashboardPage] Gagal mengambil jadwal:", err);
+      toast.error(err.response?.data?.error || 'Gagal memuat jadwal.');
+    }
+  }, []); // useCallback tanpa dependensi karena hanya menggunakan argumen
 
   useEffect(() => {
     const fetchData = async () => {
@@ -53,21 +72,19 @@ export function DashboardPage() {
 
         if (dashboardResponse.data.success) {
           setDashboardData(dashboardResponse.data.data);
-        } else {
-          toast.error(dashboardResponse.data.error || 'Gagal memuat data dasbor.');
         }
 
         if (yearsResponse.data.success && yearsResponse.data.data.length > 0) {
           const periods = yearsResponse.data.data;
-          // Extract unique years from periods
           const years = Array.from(new Set(periods.map((p: any) => p.tahun_ajaran))) as string[];
           setAvailableYears(years);
-          setSelectedYear(years[0]);
+          if (years.length > 0) {
+            setSelectedYear(years[0]); // Set tahun ajaran terpilih
+          }
         }
       } catch (err: any) {
-        console.error("[DashboardPage] Gagal mengambil data:", err);
-        setError(err.response?.data?.error || 'Gagal terhubung ke server atau terjadi kesalahan.');
-        toast.error(err.response?.data?.error || 'Gagal memuat data.');
+        console.error("[DashboardPage] Gagal mengambil data awal:", err);
+        setError(err.response?.data?.error || 'Gagal terhubung ke server.');
       } finally {
         setIsLoading(false);
       }
@@ -78,42 +95,39 @@ export function DashboardPage() {
 
   useEffect(() => {
     if (selectedYear) {
-      const fetchSchedule = async () => {
-        try {
-          const scheduleResponse = await axios.get(`${import.meta.env.VITE_API_URL}/api/account/santri/jadwal?tahun_ajaran=${selectedYear}`, { withCredentials: true });
-          if (scheduleResponse.data.success) {
-            setScheduleData(scheduleResponse.data.data.jadwal);
-          } else {
-            setScheduleData({});
-            toast.info(scheduleResponse.data.error || 'Jadwal tidak tersedia untuk tahun ajaran ini.');
-          }
-        } catch (err: any) {
-          setScheduleData({});
-          console.error("[DashboardPage] Gagal mengambil jadwal:", err);
-          toast.error(err.response?.data?.error || 'Gagal memuat jadwal.');
-        }
-      };
-      fetchSchedule();
+      fetchScheduleForYear(selectedYear);
     }
-  }, [selectedYear]);
+  }, [selectedYear, fetchScheduleForYear]);
+
+  // --- EFFECT BARU UNTUK MENDENGARKAN SINYAL ---
+  useEffect(() => {
+    const handleScheduleUpdate = () => {
+      console.log('Sinyal schedule-updated diterima, memuat ulang jadwal...');
+      if (selectedYear) {
+        fetchScheduleForYear(selectedYear);
+      }
+    };
+
+    window.addEventListener('schedule-updated', handleScheduleUpdate);
+
+    // Cleanup listener saat komponen dilepas
+    return () => {
+      window.removeEventListener('schedule-updated', handleScheduleUpdate);
+    };
+  }, [selectedYear, fetchScheduleForYear]); // Dependensi agar fungsi selalu dapat versi terbaru
 
   return (
     <div className="space-y-8">
-      {/* Header Selamat Datang */}
+      {/* Header */}
       <div className="bg-gradient-to-br from-teal-600 to-teal-800 rounded-3xl p-8 text-white shadow-2xl flex justify-between items-center">
         <div>
           <div className="flex items-center text-sm mb-2 text-teal-100">
             <Calendar className="w-4 h-4 mr-2" />
-            {new Date().toLocaleDateString("id-ID", {
-              weekday: "long",
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            })}
+            {new Date().toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
           </div>
           <h1 className="text-3xl font-extrabold mb-2">Selamat Datang, {user?.nama_santri || user?.username}!</h1>
           <p className="text-teal-100 mb-2">
-            Portal informasi lengkap untuk memantau perkembangan santri
+            Kelas: {user?.nama_kelas || 'Tanpa Kelas'} • Wali Kelas: {dashboardData?.nama_wali_kelas || 'Belum Ditentukan'}
           </p>
           {availableYears.length > 0 && (
             <div className="flex items-center text-sm text-teal-100 space-x-2">
@@ -137,7 +151,7 @@ export function DashboardPage() {
           )}
         </div>
         <div className="bg-teal-700/40 p-6 rounded-2xl">
-          <BookOpen className="w-10 h-10" />
+          <UserSquare className="w-10 h-10" />
         </div>
       </div>
 
@@ -150,17 +164,13 @@ export function DashboardPage() {
         <div className="p-4 text-center text-red-500">{error}</div>
       ) : (
         <>
-          {dashboardData ? (
+          {dashboardData && (
             <DashboardSummary
               sisaTagihan={dashboardData.sisa_tagihan}
               totalTerbayar={dashboardData.total_terbayar}
               rataRataNilai={dashboardData.rata_rata_nilai}
               progressHafalan={dashboardData.progress_hafalan}
             />
-          ) : (
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <p className="text-center text-gray-500">Data dashboard tidak tersedia</p>
-            </div>
           )}
 
           {scheduleData && Object.keys(scheduleData).length > 0 ? (
@@ -169,7 +179,7 @@ export function DashboardPage() {
               tahunAjaran={selectedYear}
             />
           ) : (
-            <div className="bg-white rounded-xl shadow-lg p-6">
+            <div className="bg-white rounded-xl shadow-lg p-6 mt-8">
               <p className="text-center text-gray-500">Jadwal tidak tersedia untuk tahun ajaran {selectedYear}</p>
             </div>
           )}
