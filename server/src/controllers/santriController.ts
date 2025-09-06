@@ -51,8 +51,8 @@ interface SantriDataRow extends RowDataPacket {
   alamat: string;
   foto_profil: string;
   email_wali: string | null;
-  nama_kelas?: string;
-  nama_jenjang?: string;
+  nama_kelas?: string | null;
+  nama_jenjang?: string | null;
 }
 interface OrangTuaDataRow extends RowDataPacket {
   status_hubungan: "Ayah" | "Ibu";
@@ -64,6 +64,13 @@ interface OrangTuaDataRow extends RowDataPacket {
   alamat: string;
   nomor_hp: string;
 }
+interface ClassHistoryRow extends RowDataPacket {
+    tahun_ajaran: string;
+    nama_kelas: string;
+    nama_jenjang: string;
+    nama_wali_kelas: string | null;
+}
+
 
 // Skema untuk validasi ganti password
 const changePasswordSchema = z.object({
@@ -392,45 +399,60 @@ export const getFullProfile = async (req: Request, res: Response) => {
             return res.status(401).json({ success: false, error: "Sesi tidak valid." });
         }
         const id_santri = req.session.user.id_santri;
-        const tahun_ajaran_sekarang = new Date().getFullYear().toString();
 
         const querySantri = `
             SELECT 
                 s.id AS id_santri, s.nama_lengkap, s.nomor_induk, s.nisn, s.tempat_lahir, 
                 s.tanggal_lahir, s.jenis_kelamin, s.anak_ke, s.dari_bersaudara, s.agama, s.alamat, 
-                s.foto_profil, p_wali.email AS email_wali,
-                k.nama_kelas, jp.nama_jenjang
+                s.foto_profil, p_wali.email AS email_wali
             FROM santri s
             LEFT JOIN pengguna p_wali ON s.id_wali = p_wali.id
-            LEFT JOIN santri_kelas sk ON s.id = sk.id_santri AND sk.tahun_ajaran = ?
-            LEFT JOIN kelas k ON sk.id_kelas = k.id
-            LEFT JOIN jenjang_pendidikan jp ON k.id_jenjang = jp.id
             WHERE s.id = ?
         `;
-        const [santriData] = await pool.query<SantriDataRow[]>(querySantri, [
-            `${tahun_ajaran_sekarang}/${parseInt(tahun_ajaran_sekarang) + 1}`,
-            id_santri,
-        ]);
+        const [santriData] = await pool.query<SantriDataRow[]>(querySantri, [id_santri]);
 
         if (santriData.length === 0) {
             return res.status(404).json({ success: false, error: "Data profil santri tidak ditemukan." });
+        }
+
+        // Query terpisah untuk mendapatkan info kelas dan jenjang TERBARU
+        const queryLatestClass = `
+            SELECT 
+                k.nama_kelas, jp.nama_jenjang
+            FROM santri_kelas sk
+            JOIN kelas k ON sk.id_kelas = k.id
+            JOIN jenjang_pendidikan jp ON k.id_jenjang = jp.id
+            WHERE sk.id_santri = ?
+            ORDER BY sk.tahun_ajaran DESC
+            LIMIT 1
+        `;
+        const [latestClassData] = await pool.query<RowDataPacket[] & { nama_kelas: string, nama_jenjang: string }[]>(queryLatestClass, [id_santri]);
+
+        const santriProfile = santriData[0];
+        // Gabungkan data kelas ke profil santri
+        if (latestClassData.length > 0) {
+            santriProfile.nama_kelas = latestClassData[0].nama_kelas;
+            santriProfile.nama_jenjang = latestClassData[0].nama_jenjang;
+        } else {
+            santriProfile.nama_kelas = null;
+            santriProfile.nama_jenjang = null;
         }
         
         const [orangTuaData] = await pool.query<OrangTuaDataRow[]>(
             "SELECT nama_lengkap, tempat_lahir, tanggal_lahir, pekerjaan, pendidikan_terakhir, alamat, nomor_hp, status_hubungan FROM orang_tua WHERE id_santri = ?",
             [id_santri]
         );
-        
+
         const ayahData = orangTuaData.find((ortu) => ortu.status_hubungan === "Ayah");
         const ibuData = orangTuaData.find((ortu) => ortu.status_hubungan === "Ibu");
 
         const fullProfile = {
             santri: {
-                ...santriData[0],
-                id_santri: santriData[0].id_santri,
-                nama_kelas: santriData[0].nama_kelas || null,
-                nama_jenjang: santriData[0].nama_jenjang || null,
-                tanggal_lahir: santriData[0].tanggal_lahir.toISOString(),
+                ...santriProfile,
+                // Pastikan id_santri ada
+                id_santri: santriProfile.id_santri,
+                // Konversi tanggal ke format string ISO
+                tanggal_lahir: santriProfile.tanggal_lahir.toISOString(),
             },
             ayah: ayahData || null,
             ibu: ibuData || null,
@@ -443,7 +465,6 @@ export const getFullProfile = async (req: Request, res: Response) => {
     }
 };
 
-// GANTI FUNGSI LAMA DENGAN INI
 export const getJadwalPelajaran = async (req: Request, res: Response) => {
     const id_santri = req.session.user?.id_santri;
     if (!id_santri) {
@@ -453,9 +474,7 @@ export const getJadwalPelajaran = async (req: Request, res: Response) => {
     try {
         let tahun_ajaran = req.query.tahun_ajaran as string;
 
-        // --- INI BAGIAN PINTARNYA ---
         if (!tahun_ajaran) {
-            // Jika TIDAK ada parameter, cari yang terbaru di DB
             const [latestYearData] = await pool.query<RowDataPacket[]>(
                 `SELECT tahun_ajaran FROM santri_kelas WHERE id_santri = ? ORDER BY tahun_ajaran DESC LIMIT 1`,
                 [id_santri]
@@ -472,10 +491,32 @@ export const getJadwalPelajaran = async (req: Request, res: Response) => {
         }
         
         const id_kelas = kelasSantri[0].id_kelas;
-        const queryJadwal = `SELECT jm.hari, jm.waktu_mulai, jm.waktu_selesai, mp.nama_mapel, p.nama_lengkap AS nama_guru FROM jadwal_mengajar jm JOIN mata_pelajaran mp ON jm.id_mapel = mp.id JOIN guru g ON jm.id_guru = g.id JOIN pengguna p ON g.id_pengguna = p.id WHERE jm.id_kelas = ? AND jm.tahun_ajaran = ? ORDER BY FIELD(jm.hari, 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'), jm.waktu_mulai ASC`;
-        const [jadwal] = await pool.query<RowDataPacket[]>(queryJadwal, [id_kelas, tahun_ajaran]);
-        const groupedJadwal = jadwal.reduce((acc, item) => { const hari = item.hari; if (!acc[hari]) acc[hari] = []; acc[hari].push({ mata_pelajaran: item.nama_mapel, nama_guru: item.nama_guru, waktu: `${item.waktu_mulai.substring(0, 5)} - ${item.waktu_selesai.substring(0, 5)}`, }); return acc; }, {} as Record<string, any[]>);
-        if (Object.keys(groupedJadwal).length === 0) { return res.status(404).json({ success: false, error: "Tidak ada jadwal ditemukan untuk kelas Anda." }); }
+        
+        const queryJadwal = `
+            SELECT jm.hari, jm.waktu_mulai, jm.waktu_selesai, mp.nama_mapel, p.nama_lengkap AS nama_guru 
+            FROM jadwal_mengajar jm 
+            JOIN mata_pelajaran mp ON jm.id_mapel = mp.id 
+            JOIN guru g ON jm.id_guru = g.id 
+            JOIN pengguna p ON g.id_pengguna = p.id 
+            WHERE jm.id_kelas = ? 
+            ORDER BY FIELD(jm.hari, 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'), jm.waktu_mulai ASC`;
+        
+        const [jadwal] = await pool.query<RowDataPacket[]>(queryJadwal, [id_kelas]);
+        
+        const groupedJadwal = jadwal.reduce((acc, item) => { 
+            const hari = item.hari;
+            if (!acc[hari]) acc[hari] = []; 
+            acc[hari].push({ 
+                mata_pelajaran: item.nama_mapel, 
+                nama_guru: item.nama_guru, 
+                waktu: `${item.waktu_mulai.substring(0, 5)} - ${item.waktu_selesai.substring(0, 5)}` 
+            }); 
+            return acc; 
+        }, {} as Record<string, any[]>);
+
+        if (Object.keys(groupedJadwal).length === 0) { 
+            return res.status(404).json({ success: false, error: "Tidak ada jadwal ditemukan untuk kelas Anda." }); 
+        }
         res.status(200).json({ success: true, data: { tahun_ajaran, jadwal: groupedJadwal } });
 
     } catch (error: any) {
@@ -525,7 +566,6 @@ export const getMyNilai = async (req: Request, res: Response) => {
   }
 };
 
-// GANTI FUNGSI LAMA DENGAN INI
 export const getRaporSemester = async (req: Request, res: Response) => {
     const id_santri = req.session.user?.id_santri;
     if (!id_santri) {
@@ -536,14 +576,11 @@ export const getRaporSemester = async (req: Request, res: Response) => {
         let tahun_ajaran: string;
         let semester: string;
 
-        // --- INI BAGIAN PINTARNYA ---
         const validation = raporQuerySchema.safeParse(req.query);
         if (validation.success) {
-            // Jika ada parameter, gunakan itu
             tahun_ajaran = validation.data.tahun_ajaran;
             semester = validation.data.semester;
         } else {
-            // Jika TIDAK ada parameter, cari yang terbaru di DB
             const [latestPeriod] = await pool.query<RowDataPacket[]>(`SELECT tahun_ajaran, semester FROM nilai WHERE id_santri = ? ORDER BY tahun_ajaran DESC, semester DESC LIMIT 1`, [id_santri]);
             if (latestPeriod.length === 0) {
                 return res.status(404).json({ success: false, error: "Belum ada data nilai yang bisa ditampilkan." });
@@ -552,7 +589,6 @@ export const getRaporSemester = async (req: Request, res: Response) => {
             semester = latestPeriod[0].semester;
         }
     
-        // Sisa kode di bawah ini tidak berubah, ia akan menggunakan `tahun_ajaran` dan `semester` yang sudah ditemukan.
         const [nilaiList] = await pool.query<RowDataPacket[]>(`SELECT mp.nama_mapel, mp.kategori, n.nilai_akhir, n.deskripsi_guru FROM nilai n JOIN mata_pelajaran mp ON n.id_mapel = mp.id WHERE n.id_santri = ? AND n.tahun_ajaran = ? AND n.semester = ? ORDER BY mp.kategori, mp.nama_mapel`, [id_santri, tahun_ajaran, semester]);
         const [rekapAbsensi] = await pool.query<RowDataPacket[]>(`SELECT status, COUNT(id) as jumlah FROM absensi WHERE id_santri = ? AND tahun_ajaran = ? GROUP BY status`, [id_santri, tahun_ajaran]);
         const [catatanPerilaku] = await pool.query<RowDataPacket[]>("SELECT kategori, deskripsi, tanggal_catatan FROM catatan_perilaku WHERE id_santri = ? AND tahun_ajaran = ? AND semester = ? ORDER BY tanggal_catatan DESC", [id_santri, tahun_ajaran, semester]);
@@ -581,28 +617,11 @@ export const getRaporSemester = async (req: Request, res: Response) => {
     }
 };
 
-// Di dalam file: src/controllers/santriController.ts
-
-// GANTI FUNGSI LAMA DENGAN VERSI DEBUG INI
 export const getAvailableRaporPeriods = async (req: Request, res: Response) => {
-    console.log("\n=============================================");
-    console.log("--- MEMERIKSA FUNGSI getAvailableRaporPeriods ---");
-
-    if (!req.session || !req.session.user) {
-        console.error("[GAGAL FATAL] Sesi (session) tidak ditemukan sama sekali. Periksa middleware Anda.");
+    const id_santri = req.session.user?.id_santri;
+    if (!id_santri) {
         return res.status(401).json({ success: false, error: 'Sesi tidak valid.' });
     }
-    
-    console.log("[INFO] Data sesi yang ditemukan:", req.session.user);
-
-    const id_santri = req.session.user.id_santri;
-
-    if (!id_santri) {
-        console.error("[GAGAL FATAL] Objek sesi ada, TAPI `id_santri` tidak ditemukan di dalamnya!");
-        return res.status(401).json({ success: false, error: 'ID Santri tidak ditemukan di data sesi.' });
-    }
-
-    console.log(`[TARGET] Akan mencari periode rapor untuk id_santri: ${id_santri}`);
     
     try {
         const query = `
@@ -612,19 +631,12 @@ export const getAvailableRaporPeriods = async (req: Request, res: Response) => {
             ORDER BY tahun_ajaran DESC, semester DESC
         `;
         
-        console.log(`[QUERY] Menjalankan SQL: SELECT DISTINCT tahun_ajaran, semester FROM nilai WHERE id_santri = ${id_santri} ...`);
-
         const [periods] = await pool.query<RowDataPacket[]>(query, [id_santri]);
 
-        console.log(`[HASIL DB] Query selesai. Ditemukan ${periods.length} periode.`);
         if (periods.length > 0) {
-            console.log("[HASIL DB] Datanya adalah:", periods);
         } else {
-            console.warn(`[PERINGATAN] TIDAK ADA DATA nilai ditemukan untuk id_santri ${id_santri}. Ini penyebab dropdown kosong.`);
         }
 
-        console.log("--- SELESAI ---");
-        console.log("=============================================\n");
         res.status(200).json({ success: true, data: periods });
         
     } catch (error: any) {
@@ -693,37 +705,30 @@ export const getSantriDashboardSummary = async (req: Request, res: Response) => 
     const id_santri = req.session.user.id_santri;
 
     try {
-        // --- LOGIKA KEUANGAN BARU DIMULAI DI SINI ---
-
-        // 1. Hitung TOTAL TAGIHAN dengan menjumlahkan semua invoice yang ada untuk santri ini.
         const [tagihanData] = await pool.query<RowDataPacket[]>(
-            `SELECT SUM(jumlah_pembayaran) AS total_semua_tagihan 
-             FROM pembayaran 
-             WHERE id_santri = ?`,
+            `SELECT SUM(rb.jumlah) AS total_tagihan_keseluruhan
+             FROM pembayaran p
+             JOIN rincian_biaya rb ON p.id_biaya = rb.id
+             WHERE p.id_santri = ?`,
             [id_santri]
         );
-        const totalTagihan = tagihanData.length > 0 && tagihanData[0].total_semua_tagihan 
-            ? parseFloat(tagihanData[0].total_semua_tagihan) 
-            : 0;
+        const totalTagihanKeseluruhan = tagihanData.length > 0 && tagihanData[0].total_tagihan_keseluruhan ? parseFloat(tagihanData[0].total_tagihan_keseluruhan) : 0;
 
-        // 2. Hitung TOTAL TERBAYAR dengan menjumlahkan invoice yang statusnya 'Diverifikasi'.
         const [pembayaranData] = await pool.query<RowDataPacket[]>(
-            `SELECT SUM(jumlah_pembayaran) AS total_terbayar 
-             FROM pembayaran 
-             WHERE id_santri = ? AND status = 'Diverifikasi'`, // Hanya hitung yang sudah lunas
+            `SELECT SUM(jumlah_pembayaran) AS total_terbayar FROM pembayaran WHERE id_santri = ? AND status = 'Diverifikasi'`,
             [id_santri]
         );
-        const totalTerbayar = pembayaranData.length > 0 && pembayaranData[0].total_terbayar 
-            ? parseFloat(pembayaranData[0].total_terbayar) 
-            : 0;
+        const totalTerbayar = pembayaranData.length > 0 && pembayaranData[0].total_terbayar ? parseFloat(pembayaranData[0].total_terbayar) : 0;
         
-        // 3. Hitung SISA TAGIHAN dari selisih keduanya.
-        const sisaTagihan = totalTagihan - totalTerbayar;
+        const [sisaTagihanData] = await pool.query<RowDataPacket[]>(
+            `SELECT SUM(rb.jumlah) AS sisa_tagihan
+             FROM pembayaran p
+             JOIN rincian_biaya rb ON p.id_biaya = rb.id
+             WHERE p.id_santri = ? AND p.status = 'BelumDibayar'`,
+            [id_santri]
+        );
+        const sisaTagihan = sisaTagihanData.length > 0 && sisaTagihanData[0].sisa_tagihan ? parseFloat(sisaTagihanData[0].sisa_tagihan) : 0;
 
-        // --- LOGIKA KEUANGAN SELESAI ---
-
-
-        // --- Kode untuk data lain (tidak berubah) ---
         const [nilaiData] = await pool.query<RowDataPacket[]>(
             "SELECT AVG(nilai_akhir) AS rata_rata_nilai FROM nilai WHERE id_santri = ?",
             [id_santri]
@@ -738,14 +743,28 @@ export const getSantriDashboardSummary = async (req: Request, res: Response) => 
             ? parseInt(hafalanData[0].nama_juz_surah.match(/\d+/)?.[0] || '0')
             : 0;
 
+        const [waliKelasData] = await pool.query<RowDataPacket[] & { nama_wali_kelas: string }[]>(
+            `SELECT p.nama_lengkap as nama_wali_kelas
+             FROM pengguna p
+             JOIN guru g ON p.id = g.id_pengguna
+             JOIN kelas k ON g.id = k.id_wali_kelas
+             JOIN santri_kelas sk ON k.id = sk.id_kelas
+             WHERE sk.id_santri = ?
+             ORDER BY sk.tahun_ajaran DESC
+             LIMIT 1`,
+            [id_santri]
+        );
+        const nama_wali_kelas = waliKelasData.length > 0 ? waliKelasData[0].nama_wali_kelas : null;
+
         res.status(200).json({
             success: true,
             data: {
                 sisa_tagihan: sisaTagihan,
                 total_terbayar: totalTerbayar,
-                total_tagihan_keseluruhan: totalTagihan, // Mengganti nama agar lebih jelas
+                total_tagihan_keseluruhan: totalTagihanKeseluruhan,
                 rata_rata_nilai: parseFloat(rataRataNilai.toFixed(2)),
                 progress_hafalan: progressHafalan,
+                nama_wali_kelas: nama_wali_kelas,
             },
         });
     } catch (error: any) {
@@ -754,7 +773,6 @@ export const getSantriDashboardSummary = async (req: Request, res: Response) => 
     }
 };
 
-// Ganti fungsi getAvailableAcademicYears Anda dengan ini
 export const getAvailableAcademicYears = async (req: Request, res: Response) => {
     const id_santri = req.session.user?.id_santri;
     if (!id_santri) {
@@ -762,7 +780,6 @@ export const getAvailableAcademicYears = async (req: Request, res: Response) => 
     }
 
     try {
-        // Mengambil tahun ajaran dan semester unik dari tabel NILAI
         const [periods] = await pool.query<RowDataPacket[]>(
             `SELECT DISTINCT tahun_ajaran, semester FROM nilai WHERE id_santri = ? ORDER BY tahun_ajaran DESC, semester DESC`,
             [id_santri]
@@ -773,7 +790,6 @@ export const getAvailableAcademicYears = async (req: Request, res: Response) => 
             return res.status(200).json({ success: true, data: [] });
         }
 
-        // Format data sesuai dengan yang diharapkan frontend
         const formattedPeriods = periods.map(period => ({
             tahun_ajaran: period.tahun_ajaran,
             semester: period.semester

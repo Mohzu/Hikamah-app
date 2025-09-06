@@ -12,6 +12,7 @@ import {
 import axios from 'axios';
 import { toast } from 'react-toastify';
 
+// --- INTERFACES ---
 interface ClassData {
   id_kelas: number;
   nama_kelas: string;
@@ -26,23 +27,24 @@ interface Teacher {
   username: string;
 }
 
+// Interface ini cukup untuk halaman ini
 interface Student {
   id_santri: number;
   nama_santri: string;
   nomor_induk: string;
 }
 
-// Type for the nested API response structure
-interface SantriApiResponseData {
-  [jenjang: string]: {
-    [kelas: string]: Student[];
-  };
+interface Jenjang {
+  id: number;
+  nama_jenjang: string;
 }
 
 export function ClassManagementPage() {
+  // --- STATES ---
   const [classes, setClasses] = useState<Record<string, ClassData[]>>({});
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [jenjangList, setJenjangList] = useState<Jenjang[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -50,7 +52,7 @@ export function ClassManagementPage() {
   const [showAssignStudentModal, setShowAssignStudentModal] = useState(false);
   const [selectedClass, setSelectedClass] = useState<ClassData | null>(null);
 
-  // Form states
+  // --- FORM STATES ---
   const [formData, setFormData] = useState({
     nama_kelas: '',
     id_jenjang: ''
@@ -65,12 +67,15 @@ export function ClassManagementPage() {
     tahun_ajaran: ''
   });
 
+  // --- EFFECTS ---
   useEffect(() => {
     fetchClasses();
     fetchTeachers();
     fetchStudents();
+    fetchJenjang();
   }, []);
 
+  // --- API CALLS ---
   const fetchClasses = async () => {
     try {
       setLoading(true);
@@ -103,25 +108,38 @@ export function ClassManagementPage() {
     }
   };
 
+  // --- PERBAIKAN DI SINI ---
   const fetchStudents = async () => {
     try {
-      const response = await axios.get<{ success: boolean; data: SantriApiResponseData }>(
+      const response = await axios.get<{ success: boolean; data: Student[] }>(
         `${import.meta.env.VITE_API_URL}/api/manage/santri/santri`,
         { withCredentials: true }
       );
       
       if (response.data.success) {
-        // Flatten students from nested structure with proper typing
-        const allStudents: Student[] = Object.values(response.data.data).flatMap(jenjang => 
-          Object.values(jenjang).flat()
-        );
-        setStudents(allStudents);
+        // Langsung gunakan data array dari API
+        setStudents(response.data.data);
       }
     } catch (error: any) {
       console.error('Error fetching students:', error);
     }
   };
 
+  const fetchJenjang = async () => {
+    try {
+      const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/manage/akademik/jenjang`, {
+        withCredentials: true
+      });
+      if (response.data.success) {
+        setJenjangList(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching jenjang:', error);
+      toast.error('Gagal mengambil data jenjang pendidikan');
+    }
+  };
+
+  // --- HANDLERS ---
   const handleAddClass = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -208,9 +226,7 @@ export function ClassManagementPage() {
         setShowAssignStudentModal(false);
         setSelectedClass(null);
         setStudentFormData({ id_santri: '', tahun_ajaran: '' });
-        // Refresh classes and students so Students page Kelas/Jenjang reflects updates
         fetchClasses();
-        // Notify StudentsManagementPage to refetch via a simple window event
         window.dispatchEvent(new Event('santri-assigned'));
       }
     } catch (error: any) {
@@ -238,13 +254,13 @@ export function ClassManagementPage() {
     }
   };
 
-  // Flatten classes for search
+  // --- RENDER LOGIC ---
   const allClasses = Object.values(classes).flat();
 
   const filteredClasses = allClasses.filter(classData =>
     classData.nama_kelas.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    classData.nama_jenjang.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    classData.nama_wali_kelas?.toLowerCase().includes(searchTerm.toLowerCase())
+    (classData.nama_jenjang && classData.nama_jenjang.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (classData.nama_wali_kelas && classData.nama_wali_kelas.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const openAssignWaliModal = (classData: ClassData) => {
@@ -255,34 +271,6 @@ export function ClassManagementPage() {
   const openAssignStudentModal = (classData: ClassData) => {
     setSelectedClass(classData);
     setShowAssignStudentModal(true);
-  };
-
-  // Extract nested ternary for better readability
-  const getWaliKelasDisplay = (_classData: ClassData) => {
-    if (classData.nama_wali_kelas) {
-      return (
-        <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            <UserCheck size={14} className="text-green-600 mr-1" />
-            <span className="text-sm text-gray-700">Wali: {classData.nama_wali_kelas}</span>
-          </div>
-          <button
-            onClick={() => handleUnassignWaliKelas(classData.id_kelas)}
-            className="p-1 bg-yellow-50 text-yellow-600 rounded hover:bg-yellow-100 transition-colors"
-            title="Lepas Jabatan"
-          >
-            <UserMinus size={12} />
-          </button>
-        </div>
-      );
-    }
-    
-    return (
-      <div className="flex items-center">
-        <UserCheck size={14} className="text-gray-400 mr-1" />
-        <span className="text-sm text-gray-500">Belum ada wali kelas</span>
-      </div>
-    );
   };
 
   return (
@@ -327,7 +315,7 @@ export function ClassManagementPage() {
           </div>
         </div>
 
-        {/* Classes Table (aligned to Teachers table style) */}
+        {/* Classes Table */}
         {loading ? (
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
@@ -456,9 +444,11 @@ export function ClassManagementPage() {
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 >
                   <option value="">Pilih Jenjang</option>
-                  <option value="1">SD/MI</option>
-                  <option value="2">SMP/MTs</option>
-                  <option value="3">SMA/MA</option>
+                  {jenjangList.map((jenjang) => (
+                    <option key={jenjang.id} value={jenjang.id}>
+                      {jenjang.nama_jenjang}
+                    </option>
+                  ))}
                 </select>
               </div>
 

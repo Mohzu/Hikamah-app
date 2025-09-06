@@ -7,7 +7,6 @@ import { z } from 'zod';
 
 // --- INTERFACES & TYPES & SKEMA ---
 interface UnverifiedRow extends RowDataPacket { /*...*/ }
-interface SantriListItem extends RowDataPacket { /*...*/ }
 interface SantriForVerification extends RowDataPacket { /*...*/ }
 interface SantriForDeletion extends RowDataPacket { /*...*/ }
 
@@ -39,38 +38,51 @@ export const getUnverifiedRegistrations = async (req: Request, res: Response) =>
     }
 };
 
+// --- FUNGSI getAllSantri YANG DIPERBARUI ---
 export const getAllSantri = async (req: Request, res: Response) => {
     try {
         const query = `
             SELECT 
-                s.id AS id_santri, s.nomor_induk, s.nama_lengkap AS nama_santri, s.nisn, s.foto_profil,
-                w.nama_lengkap AS nama_wali, k.nama_kelas, jp.nama_jenjang
+                s.*, -- Mengambil semua kolom dari tabel santri
+                s.id AS id_santri, -- Alias untuk konsistensi
+                s.nama_lengkap AS nama_santri,
+                w.nama_lengkap AS nama_wali,
+                w.email AS email_wali,
+                (
+                    SELECT k.nama_kelas 
+                    FROM kelas k 
+                    JOIN santri_kelas sk ON k.id = sk.id_kelas 
+                    WHERE sk.id_santri = s.id 
+                    ORDER BY sk.tahun_ajaran DESC 
+                    LIMIT 1
+                ) AS nama_kelas,
+                (
+                    SELECT jp.nama_jenjang 
+                    FROM jenjang_pendidikan jp 
+                    JOIN kelas k ON jp.id = k.id_jenjang 
+                    JOIN santri_kelas sk ON k.id = sk.id_kelas 
+                    WHERE sk.id_santri = s.id 
+                    ORDER BY sk.tahun_ajaran DESC 
+                    LIMIT 1
+                ) AS nama_jenjang,
+                ayah.nama_lengkap AS nama_ayah,
+                ayah.pekerjaan AS pekerjaan_ayah,
+                ayah.nomor_hp AS nomor_hp_ayah,
+                ibu.nama_lengkap AS nama_ibu,
+                ibu.pekerjaan AS pekerjaan_ibu,
+                ibu.nomor_hp AS nomor_hp_ibu
             FROM santri s
             LEFT JOIN pengguna w ON s.id_wali = w.id
-            LEFT JOIN santri_kelas sk ON s.id = sk.id_santri AND sk.tahun_ajaran = (SELECT MAX(tahun_ajaran) FROM santri_kelas WHERE id_santri = s.id)
-            LEFT JOIN kelas k ON sk.id_kelas = k.id
-            LEFT JOIN jenjang_pendidikan jp ON k.id_jenjang = jp.id
-            ORDER BY s.nama_lengkap`;
-        const [santriList] = await pool.query<SantriListItem[]>(query);
-
-        // Logika pengelompokan Anda sudah benar
-        const groupedData = santriList.reduce((acc, santri) => {
-            const jenjang = santri.nama_jenjang || 'Belum Ditempatkan';
-            if (!acc[jenjang]) acc[jenjang] = {};
-            const kelas = santri.nama_kelas || 'Tanpa Kelas';
-            if (!acc[jenjang][kelas]) acc[jenjang][kelas] = [];
-            acc[jenjang][kelas].push({
-                id_santri: santri.id_santri,
-                nomor_induk: santri.nomor_induk,
-                nama_santri: santri.nama_santri,
-                nisn: santri.nisn,
-                foto_profil: santri.foto_profil,
-                nama_wali: santri.nama_wali
-            });
-            return acc;
-        }, {} as Record<string, Record<string, any[]>>);
+            LEFT JOIN orang_tua ayah ON s.id = ayah.id_santri AND ayah.status_hubungan = 'Ayah'
+            LEFT JOIN orang_tua ibu ON s.id = ibu.id_santri AND ibu.status_hubungan = 'Ibu'
+            WHERE s.id_pengguna IS NOT NULL -- Hanya ambil santri yang sudah punya akun (terverifikasi)
+            ORDER BY s.nama_lengkap ASC`;
+            
+        const [santriList] = await pool.query<RowDataPacket[]>(query);
         
-        res.status(200).json({ success: true, data: groupedData });
+        // Mengirimkan data sebagai flat array, bukan lagi dikelompokkan
+        res.status(200).json({ success: true, data: santriList });
+
     } catch (error: any) {
         console.error('Error saat mengambil semua data santri:', error);
         res.status(500).json({ success: false, error: 'Gagal mengambil data semua santri.' });

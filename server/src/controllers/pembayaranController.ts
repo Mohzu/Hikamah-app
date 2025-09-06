@@ -6,10 +6,7 @@ import pool from '../config/db.js';
 import { z } from 'zod';
 
 // Zod schema to validate the payment submission data
-const submitPaymentSchema = z.object({
-    id_pembayaran: z.coerce.number().int().positive(),
-    jumlah: z.coerce.number().positive(),
-});
+ 
 
 // --- Controller untuk Santri ---
 
@@ -24,7 +21,19 @@ export const getDaftarPembayaranSantri = async (req: Request, res: Response) => 
 
     try {
         const [histori] = await pool.query<RowDataPacket[]>(
-            'SELECT * FROM pembayaran WHERE id_santri = ? ORDER BY dibuat_pada DESC',
+            `
+            SELECT 
+                p.*, 
+                rb.nama_biaya
+            FROM 
+                pembayaran p
+            JOIN 
+                rincian_biaya rb ON p.id_biaya = rb.id
+            WHERE 
+                p.id_santri = ? 
+            ORDER BY 
+                p.dibuat_pada DESC
+            `,
             [user.id_santri]
         );
         res.status(200).json({ success: true, data: histori });
@@ -37,6 +46,13 @@ export const getDaftarPembayaranSantri = async (req: Request, res: Response) => 
 /**
  * Mengirimkan bukti pembayaran untuk sebuah tagihan.
  */
+const submitPaymentSchema = z.object({
+    id_pembayaran: z.array(z.coerce.number().int().positive()), // Expect an array of IDs
+    jumlah: z.coerce.number().positive(), // Total amount transferred
+});
+
+// ... (rest of the file)
+
 export const submitPayment = async (req: Request, res: Response) => {
     const id_santri = req.session.user?.id_santri;
     if (!id_santri) {
@@ -52,41 +68,79 @@ export const submitPayment = async (req: Request, res: Response) => {
         });
     }
 
-    const { id_pembayaran, jumlah } = validation.data;
+    const { id_pembayaran: idsToUpdate, jumlah: totalAmountTransferred } = validation.data;
     const bukti_transfer = req.file?.filename ? `/uploads/bukti-transfer/${req.file.filename}` : null;
 
     if (!bukti_transfer) {
         return res.status(400).json({ success: false, error: 'Bukti transfer tidak diunggah.' });
     }
 
+    if (idsToUpdate.length === 0) {
+        return res.status(400).json({ success: false, error: 'Tidak ada tagihan yang dipilih untuk dibayar.' });
+    }
+
     try {
+        // 1. Fetch details of selected bills to validate total amount and status
+        const [selectedBills] = await pool.query<RowDataPacket[]>(
+            `
+            SELECT 
+                p.id, 
+                p.status, 
+                rb.jumlah AS jumlah_tagihan 
+            FROM 
+                pembayaran p
+            JOIN
+                rincian_biaya rb ON p.id_biaya = rb.id
+            WHERE 
+                p.id IN (?) AND p.id_santri = ?
+            `,
+            [idsToUpdate, id_santri]
+        );
+
+        if (selectedBills.length !== idsToUpdate.length) {
+            return res.status(404).json({ success: false, error: 'Beberapa tagihan tidak ditemukan atau bukan milik Anda.' });
+        }
+
+        let totalExpectedAmount = 0;
+        for (const bill of selectedBills) {
+            if (bill.status !== 'BelumDibayar') {
+                return res.status(400).json({ success: false, error: `Tagihan ${bill.id} sudah dibayar atau dalam proses verifikasi.` });
+            }
+            totalExpectedAmount += parseFloat(bill.jumlah_tagihan);
+        }
+
+        // 2. Validate total amount transferred against expected total
+        if (totalAmountTransferred !== totalExpectedAmount) {
+            return res.status(400).json({ success: false, error: 'Jumlah transfer tidak sesuai dengan total tagihan yang dipilih.' });
+        }
+
+        // 3. Update selected payments
         const query = `
             UPDATE pembayaran
-            SET jumlah_pembayaran = ?,
+            SET 
                 bukti_pembayaran = ?,
                 status = 'MenungguVerifikasi',
                 tanggal_pembayaran = NOW()
-            WHERE id = ? AND id_santri = ? AND status = 'BelumDibayar';
+            WHERE id IN (?) AND id_santri = ? AND status = 'BelumDibayar';
         `;
         
         const [result] = await pool.query<OkPacket>(query, [
-            jumlah,
             bukti_transfer,
-            id_pembayaran,
+            idsToUpdate,
             id_santri,
         ]);
 
         if (result.affectedRows === 0) {
             return res.status(404).json({
                 success: false,
-                error: 'Pembayaran tidak ditemukan, sudah dibayar, atau sedang dalam proses verifikasi.',
+                error: 'Tidak ada tagihan yang berhasil diperbarui. Pastikan statusnya BelumDibayar.',
             });
         }
 
         res.status(200).json({
             success: true,
             data: {
-                message: 'Pembayaran berhasil dikirim. Menunggu verifikasi.',
+                message: `${result.affectedRows} pembayaran berhasil dikirim. Menunggu verifikasi.`, // Dynamic message
                 bukti_transfer,
             },
         });

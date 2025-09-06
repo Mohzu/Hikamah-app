@@ -84,18 +84,38 @@ export const unassignWaliKelas = async (req: Request, res: Response) => {
 export const assignSantriToKelas = async (req: Request, res: Response) => {
     const paramsValidation = idKelasParamsSchema.safeParse(req.params);
     const bodyValidation = assignSantriSchema.safeParse(req.body);
-    if (!paramsValidation.success || !bodyValidation.success) return res.status(400).json({ success: false, error: "Data atau parameter URL tidak valid" });
+    if (!paramsValidation.success || !bodyValidation.success) {
+        return res.status(400).json({ success: false, error: "Data atau parameter URL tidak valid" });
+    }
     
     const { id_kelas } = paramsValidation.data;
     const { id_santri, tahun_ajaran } = bodyValidation.data;
+
     try {
-        // Query asli Anda sudah benar dan efisien
-        const sql = 'INSERT INTO santri_kelas (id_santri, id_kelas, tahun_ajaran) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE id_kelas = VALUES(id_kelas)';
-        await pool.query(sql, [id_santri, id_kelas, tahun_ajaran]);
-        res.status(200).json({ success: true, data: { message: "Santri berhasil ditempatkan di kelas." } });
+        // Cek apakah santri sudah terdaftar di kelas lain pada tahun ajaran yang sama
+        const [existing] = await pool.query<RowDataPacket[]>(
+            'SELECT id FROM santri_kelas WHERE id_santri = ? AND tahun_ajaran = ?',
+            [id_santri, tahun_ajaran]
+        );
+
+        if (existing.length > 0) {
+            // Jika sudah ada, UPDATE kelasnya (memindahkan santri)
+            await pool.query(
+                'UPDATE santri_kelas SET id_kelas = ? WHERE id_santri = ? AND tahun_ajaran = ?',
+                [id_kelas, id_santri, tahun_ajaran]
+            );
+            res.status(200).json({ success: true, data: { message: "Perpindahan kelas santri berhasil." } });
+        } else {
+            // Jika belum ada, INSERT data baru
+            await pool.query(
+                'INSERT INTO santri_kelas (id_santri, id_kelas, tahun_ajaran) VALUES (?, ?, ?)',
+                [id_santri, id_kelas, tahun_ajaran]
+            );
+            res.status(201).json({ success: true, data: { message: "Santri berhasil ditempatkan di kelas." } });
+        }
     } catch (error: any) {
         console.error("Error saat menempatkan santri:", error);
-        res.status(500).json({ success: false, error: "Gagal menempatkan santri." });
+        res.status(500).json({ success: false, error: "Gagal menempatkan santri karena kesalahan server." });
     }
 };
 

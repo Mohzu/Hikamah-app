@@ -1,7 +1,8 @@
 // client/src/components/ParentModule/organisms/ScheduleTable.tsx
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Calendar, Clock, BookOpen, User } from 'lucide-react';
+import { toast } from 'react-toastify';
 
 interface JadwalItem {
   mata_pelajaran: string;
@@ -18,7 +19,6 @@ interface ScheduleTableProps {
   tahunAjaran: string;
 }
 
-// Helper function untuk memberikan warna pada hari
 const getDayColor = (day: string) => {
   const colors: { [key: string]: string } = {
     'Senin': 'bg-blue-100 text-blue-800',
@@ -30,8 +30,55 @@ const getDayColor = (day: string) => {
   return colors[day] || 'bg-gray-100 text-gray-800';
 };
 
+const dayMap: { [key: number]: string } = {
+  1: 'Senin',
+  2: 'Selasa',
+  3: 'Rabu',
+  4: 'Kamis',
+  5: 'Jumat',
+  6: 'Sabtu',
+  0: 'Minggu',
+};
+
 export const ScheduleTable: React.FC<ScheduleTableProps> = ({ jadwal, tahunAjaran }) => {
   const orderedDays = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
+  const [notifiedSchedules, setNotifiedSchedules] = useState<string[]>([]);
+
+  useEffect(() => {
+    const checkSchedules = () => {
+      const now = new Date();
+      const currentDayName = dayMap[now.getDay()];
+      const todaySchedules = jadwal[currentDayName];
+
+      if (todaySchedules) {
+        todaySchedules.forEach(schedule => {
+          const startTimeStr = schedule.waktu.split(' - ')[0];
+          const [hours, minutes] = startTimeStr.split(':').map(Number);
+
+          const scheduleTime = new Date();
+          scheduleTime.setHours(hours, minutes, 0, 0);
+
+          const diffInMinutes = Math.round((scheduleTime.getTime() - now.getTime()) / 60000);
+
+          const scheduleId = `${currentDayName}-${schedule.waktu}-${schedule.mata_pelajaran}`;
+
+          if (diffInMinutes === 30 && !notifiedSchedules.includes(scheduleId)) {
+            toast.info(`Pelajaran ${schedule.mata_pelajaran} akan dimulai dalam 30 menit.`, {
+              autoClose: 10000, // Notifikasi akan hilang setelah 10 detik
+            });
+            setNotifiedSchedules(prev => [...prev, scheduleId]);
+          }
+        });
+      }
+    };
+
+    // Jalankan pengecekan setiap menit
+    const intervalId = setInterval(checkSchedules, 60000);
+
+    // Bersihkan interval saat komponen dilepas
+    return () => clearInterval(intervalId);
+
+  }, [jadwal, notifiedSchedules]);
 
   return (
     <div className="bg-white rounded-3xl shadow-xl p-6 border border-gray-100">
