@@ -3,5 +3,5 @@ export type Payment = {
   date: string;
   description: string;
   amount: number;
-  status: 'Lunas' | 'Menunggu Konfirmasi' | 'Belum Lunas';
+  status: 'BelumDibayar' | 'MenungguVerifikasi' | 'Diverifikasi';
 };

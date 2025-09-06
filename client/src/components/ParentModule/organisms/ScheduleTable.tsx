@@ -16,7 +16,6 @@ interface JadwalPelajaran {
 
 interface ScheduleTableProps {
   jadwal: JadwalPelajaran;
-  tahunAjaran: string;
 }
 
 const getDayColor = (day: string) => {
@@ -40,7 +39,7 @@ const dayMap: { [key: number]: string } = {
   0: 'Minggu',
 };
 
-export const ScheduleTable: React.FC<ScheduleTableProps> = ({ jadwal, tahunAjaran }) => {
+export const ScheduleTable: React.FC<ScheduleTableProps> = ({ jadwal }) => {
   const orderedDays = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat'];
   const [notifiedSchedules, setNotifiedSchedules] = useState<string[]>([]);
 
