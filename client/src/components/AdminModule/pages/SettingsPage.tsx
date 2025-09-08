@@ -150,7 +150,7 @@ export function SettingsPage() {
         {/* Content */}
         {activeTab === 'profile' ? (
           /* Profile Tab */
-          <div className="max-w-2xl">
+          <div className="w-full">
             <div className="bg-gray-50 rounded-xl p-6 mb-6">
               <div className="flex items-center space-x-4 mb-4">
                 <div className="w-16 h-16 bg-gradient-to-br from-blue-100 to-blue-200 rounded-2xl flex items-center justify-center">
@@ -220,7 +220,7 @@ export function SettingsPage() {
           </div>
         ) : (
           /* Password Tab */
-          <div className="max-w-2xl">
+          <div className="w-full">
             <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 mb-6">
               <div className="flex items-center space-x-3">
                 <Lock className="w-6 h-6 text-yellow-600" />
