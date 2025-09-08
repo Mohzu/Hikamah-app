@@ -6,13 +6,25 @@ import {
   getPembayaranMasuk,
   validasiPembayaran,
   createTagihan,
-  setRincianPembayaran
+  setRincianPembayaran,
+  createRincianBiaya, // <-- Diimpor
+  getSemuaRincianBiaya // <-- Diimpor
 } from '../controllers/bendaharaController.js';
 
 const router: Router = Router();
 
 // Middleware ini memastikan hanya bendahara yang sudah login yang bisa mengakses rute di bawahnya
 router.use(isLoggedIn, isBendahara);
+
+
+// --- Rute untuk Master Data Biaya ---
+
+// Membuat rincian biaya baru
+router.post('/rincian-biaya', createRincianBiaya);
+
+// Mengambil semua rincian biaya
+router.get('/rincian-biaya', getSemuaRincianBiaya);
+
 
 // --- Rute Khusus Bendahara untuk Mengelola Pembayaran ---
 
