@@ -5,12 +5,13 @@ import {
   Settings,
   BookOpen,
   LogOut,
-  X
+  X,
+  Wallet
 } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContexts';
 import { useNavigate, useLocation } from 'react-router-dom';
 
-export type AdminPage = 'teachers' | 'students' | 'homeroom' | 'academic' | 'settings';
+export type AdminPage = 'teachers' | 'students' | 'homeroom' | 'academic' | 'treasurer' | 'settings';
 
 interface AdminSidebarProps {
   onToggle: () => void;
@@ -29,6 +30,7 @@ export function AdminSidebar({ onToggle }: AdminSidebarProps) {
     { id: 'students' as AdminPage, label: 'Manajemen Santri', icon: GraduationCap },
     { id: 'homeroom' as AdminPage, label: 'Manajemen Kelas', icon: UserCheck },
     { id: 'academic' as AdminPage, label: 'Manajemen Akademik', icon: BookOpen },
+    { id: 'treasurer' as AdminPage, label: 'Manajemen Bendahara', icon: Wallet },
     { id: 'settings' as AdminPage, label: 'Pengaturan', icon: Settings },
   ];
 

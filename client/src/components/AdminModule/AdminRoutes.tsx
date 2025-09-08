@@ -6,6 +6,7 @@ import { StudentsManagementPage } from './pages/StudentsManagementPage';
 import { ClassManagementPage } from './pages/ClassManagementPage';
 import { AcademicManagementPage } from './pages/AcademicManagementPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { BendaharaManagementPage } from './pages/BendaharaManagementPage';
 
 export function AdminRoutes() {
   return (
@@ -17,6 +18,7 @@ export function AdminRoutes() {
         <Route path="/students" element={<StudentsManagementPage />} />
         <Route path="/homeroom" element={<ClassManagementPage />} />
         <Route path="/academic" element={<AcademicManagementPage />} />
+        <Route path="/treasurer" element={<BendaharaManagementPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
       </Routes>
