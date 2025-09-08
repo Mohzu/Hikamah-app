@@ -1,3 +1,4 @@
+
 import { Request, Response } from 'express';
 import pool from '../../config/db.js';
 import bcrypt from 'bcryptjs';
@@ -18,7 +19,7 @@ const createBendaharaSchema = z.object({
 export const getAllBendahara = async (req: Request, res: Response) => {
   try {
     const [rows] = await pool.execute(
-      "SELECT id, nama_lengkap, email, username, peran, created_at, status_aktif FROM pengguna WHERE LOWER(peran) = 'bendahara' ORDER BY nama_lengkap"
+      "SELECT id, nama_lengkap, email, username, peran, status_aktif FROM pengguna WHERE LOWER(peran) = 'bendahara' ORDER BY nama_lengkap"
     );
     res.json(rows);
   } catch (error) {
