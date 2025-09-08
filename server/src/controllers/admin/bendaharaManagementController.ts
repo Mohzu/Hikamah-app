@@ -1,7 +1,16 @@
-
 import { Request, Response } from 'express';
 import pool from '../../config/db.js';
 import bcrypt from 'bcryptjs';
+import { z } from 'zod';
+import { PoolConnection, RowDataPacket, OkPacket } from 'mysql2/promise';
+
+// Skema validasi dari kode Anda yang sebelumnya berjalan
+const createBendaharaSchema = z.object({
+  nama_lengkap: z.string().min(1, { message: "Nama lengkap harus diisi." }),
+  username: z.string().min(3, { message: "Username minimal 3 karakter." }),
+  email: z.string().email({ message: "Format email tidak valid" }),
+  password: z.string().min(6, { message: "Password minimal 6 karakter." }),
+});
 
 // @desc    Get all bendahara
 // @route   GET /api/admin/bendahara
@@ -9,7 +18,7 @@ import bcrypt from 'bcryptjs';
 export const getAllBendahara = async (req: Request, res: Response) => {
   try {
     const [rows] = await pool.execute(
-      "SELECT id, nama_lengkap, email, peran, created_at FROM pengguna WHERE LOWER(peran) = 'bendahara' ORDER BY nama_lengkap"
+      "SELECT id, nama_lengkap, email, username, peran, created_at, status_aktif FROM pengguna WHERE LOWER(peran) = 'bendahara' ORDER BY nama_lengkap"
     );
     res.json(rows);
   } catch (error) {
@@ -18,68 +27,77 @@ export const getAllBendahara = async (req: Request, res: Response) => {
   }
 };
 
-// @desc    Create new bendahara
-// @route   POST /api/admin/bendahara
+// @desc    Create new bendahara account (menggunakan kode Anda)
+// @route   POST /api/admin/bendahara/create
 // @access  Private/Admin
-export const createBendahara = async (req: Request, res: Response) => {
-  const { nama, email, password } = req.body;
-
-  if (!nama || !email || !password) {
-    return res.status(400).json({ message: 'Please provide all required fields' });
+export const createBendaharaAccount = async (req: Request, res: Response) => {
+  const validationResult = createBendaharaSchema.safeParse(req.body);
+  if (!validationResult.success) {
+    return res.status(400).json({
+      success: false,
+      error: "Data yang dikirim tidak valid",
+      details: validationResult.error.flatten().fieldErrors
+    });
   }
 
+  const { nama_lengkap, username, email, password } = validationResult.data;
+  let connection: PoolConnection | undefined;
   try {
-    // Check if pengguna with that email already exists
-    const [existingPengguna]: any = await pool.execute('SELECT id FROM pengguna WHERE email = ?', [email]);
-    if (existingPengguna.length > 0) {
-      return res.status(400).json({ message: 'Pengguna with this email already exists' });
+    connection = await pool.getConnection();
+    if (!connection) { throw new Error("Gagal mendapatkan koneksi database."); }
+    await connection.beginTransaction();
+
+    const [existingUser] = await connection.query<RowDataPacket[]>('SELECT id FROM pengguna WHERE username = ? OR email = ?', [username, email]);
+    if (existingUser.length > 0) {
+      await connection.rollback();
+      return res.status(409).json({ success: false, error: "Username atau email sudah digunakan." });
     }
 
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    const [penggunaResult]: any = await pool.execute(
-      'INSERT INTO pengguna (nama_lengkap, email, kata_sandi, peran) VALUES (?, ?, ?, ?)',
-      [nama, email, hashedPassword, 'bendahara']
+    const [resultPengguna] = await connection.query<OkPacket>(
+      'INSERT INTO pengguna (nama_lengkap, username, email, kata_sandi, peran, status_aktif) VALUES (?, ?, ?, ?, ?, ?)',
+      [nama_lengkap, username, email, hashedPassword, 'Bendahara', true]
     );
 
-    const penggunaId = penggunaResult.insertId;
-
+    await connection.commit();
     res.status(201).json({
-      id: penggunaId,
-      nama_lengkap: nama,
-      email,
-      peran: 'bendahara',
+      success: true,
+      data: {
+        message: `Akun bendahara ${nama_lengkap} berhasil dibuat.`,
+        id_pengguna_baru: resultPengguna.insertId
+      }
     });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
+  } catch (error: any) {
+    if (connection) await connection.rollback();
+    console.error("Error saat membuat akun bendahara:", error);
+    res.status(500).json({ success: false, error: "Gagal membuat akun bendahara karena kesalahan server." });
+  } finally {
+    if (connection) connection.release();
   }
 };
+
 
 // @desc    Delete a bendahara
 // @route   DELETE /api/admin/bendahara/:id
 // @access  Private/Admin
 export const deleteBendahara = async (req: Request, res: Response) => {
-  const { id: penggunaId } = req.params; // This is the pengguna ID
+  const { id: penggunaId } = req.params;
 
   try {
-    // First, verify the pengguna exists and is a bendahara before deleting
     const [penggunaRows]: any = await pool.execute('SELECT peran FROM pengguna WHERE id = ?', [penggunaId]);
 
     if (penggunaRows.length === 0) {
-      return res.status(404).json({ message: 'Pengguna not found' });
+      return res.status(404).json({ message: 'Pengguna tidak ditemukan' });
     }
 
-    // Case-insensitive check
     if (penggunaRows[0].peran.toLowerCase() !== 'bendahara') {
       return res.status(403).json({ message: `This pengguna is not a bendahara, but a ${penggunaRows[0].peran}` });
     }
 
-    // Proceed with deletion
     await pool.execute('DELETE FROM pengguna WHERE id = ?', [penggunaId]);
 
-    res.status(200).json({ message: 'Bendahara account deleted successfully' });
+    res.status(200).json({ message: 'Akun bendahara berhasil dihapus' });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error' });

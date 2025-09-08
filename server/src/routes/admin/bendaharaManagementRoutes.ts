@@ -1,14 +1,19 @@
 import express from 'express';
-import { isAdmin } from '../../middleware/authMiddleware.js';
-import { getAllBendahara, createBendahara, deleteBendahara } from '../../controllers/admin/bendaharaManagementController.js';
+import { protect, isAdmin } from '../../middleware/authMiddleware.js';
+import { getAllBendahara, createBendaharaAccount, deleteBendahara } from '../../controllers/admin/bendaharaManagementController.js';
 
 const router = express.Router();
 
+// GET all bendahara
 router.route('/')
-  .get(isAdmin, getAllBendahara)
-  .post(isAdmin, createBendahara);
+  .get(protect, isAdmin, getAllBendahara);
 
+// POST a new bendahara
+router.route('/create')
+  .post(protect, isAdmin, createBendaharaAccount); // Menggunakan nama fungsi yang benar
+
+// DELETE a bendahara
 router.route('/:id')
-  .delete(isAdmin, deleteBendahara);
+  .delete(protect, isAdmin, deleteBendahara);
 
 export default router;
