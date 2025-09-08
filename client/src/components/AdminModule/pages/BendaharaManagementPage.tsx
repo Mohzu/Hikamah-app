@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
- import { Shield, User, AtSign, Mail, Lock, CheckCircle2, Eye, EyeOff, Save, Wallet } from 'lucide-react';
+import { Shield, User, AtSign, Mail, Lock, CheckCircle2, Eye, EyeOff, Save, Wallet } from 'lucide-react';
 
 export function BendaharaManagementPage() {
   const [namaLengkap, setNamaLengkap] = useState('');
