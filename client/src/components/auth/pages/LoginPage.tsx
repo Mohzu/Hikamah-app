@@ -3,6 +3,7 @@ import { BookOpen, Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContexts';
 
+
 export function LoginPage() {
   // Mengubah state dari 'email' menjadi 'username'
   const [username, setUsername] = useState('');
@@ -36,11 +37,11 @@ export function LoginPage() {
       <div className="max-w-md w-full space-y-8">
         {/* Header */}
         <div className="text-center">
-          <div className="mx-auto w-20 h-20 bg-gradient-to-br from-teal-600 to-teal-700 rounded-2xl flex items-center justify-center shadow-lg">
-            <BookOpen className="w-10 h-10 text-white" />
+        <div className="mx-auto w-20 h-20 bg-gradient-to-br from-teal-600 to-teal-700 rounded-2xl flex items-center justify-center shadow-lg">
+        <BookOpen className="w-10 h-10 text-white" />
           </div>
           <h2 className="mt-6 text-3xl font-bold text-gray-900">
-            Portal Madrasah
+            Portal Madrasah Diniyyah Ula An-Nuur
           </h2>
         </div>
 
