@@ -12,6 +12,15 @@ import 'react-toastify/dist/ReactToastify.css';
 
 // Set base URL untuk semua request Axios
 axios.defaults.baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000'; 
+const API_URL = import.meta.env.VITE_API_URL;
+
+if (!API_URL) {
+  // Menampilkan error yang jelas saat development jika URL API tidak diatur.
+  // Ini mencegah kegagalan diam-diam dan membuat masalah konfigurasi menjadi jelas.
+  throw new Error("VITE_API_URL is not defined. Please create a .env file in the client directory and set this variable to your backend API's URL.");
+}
+
+axios.defaults.baseURL = API_URL;
 axios.defaults.withCredentials = true; 
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

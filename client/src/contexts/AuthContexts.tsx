@@ -10,7 +10,7 @@ interface User {
   nama_santri?: string;
   nama_pengguna?: string;
   email?: string;
-  peran: 'Admin' | 'Guru' | 'Santri' | 'Wali Santri';
+  peran: 'Admin' | 'Guru' | 'Santri' | 'Wali Santri' | 'Bendahara';
   id_santri?: number;
   nama_kelas?: string | null; // Ditambahkan
   nama_jenjang?: string | null; // Ditambahkan
@@ -64,6 +64,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           case 'Admin':
             console.log('[AuthContext] Redirecting to admin dashboard');
             navigate('/admin/dashboard');
+            break;
+          case 'Bendahara':
+            console.log('[AuthContext] Redirecting to bendahara dashboard');
+            navigate('/bendahara/dashboard');
             break;
           case 'Guru':
             console.log('[AuthContext] Redirecting to guru dashboard');

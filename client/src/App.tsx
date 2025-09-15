@@ -8,6 +8,7 @@ import { MainTemplate } from './components/ParentModule/templates/MainTemplate';
 import { useAuth } from './contexts/AuthContexts';
 import { DashboardPage } from './components/ParentModule/pages/DashboardPage';
 import { AdminRoutes } from './components/AdminModule/AdminRoutes';
+import { BendaharaRoutes } from './components/BendaharaModule/BendaharaRoutes';
 import { StudentDataProvider } from './contexts/StudentDataContext';
 
 interface ProtectedRouteProps {
@@ -49,6 +50,14 @@ function App() {
         element={
           <ProtectedRoute isAllowed={isLoggedIn && user?.peran === "Admin"}>
             <AdminRoutes />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/bendahara/*"
+        element={
+          <ProtectedRoute isAllowed={isLoggedIn && user?.peran === "Bendahara"}>
+            <BendaharaRoutes />
           </ProtectedRoute>
         }
       />

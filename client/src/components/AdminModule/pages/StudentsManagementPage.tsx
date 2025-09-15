@@ -68,6 +68,7 @@ export function StudentsManagementPage() {
   const [selectedRegistration, setSelectedRegistration] = useState<UnverifiedRegistration | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [showViewStudentModal, setShowViewStudentModal] = useState(false);
+  const [verifying, setVerifying] = useState(false);
 
   useEffect(() => {
     fetchStudents();
@@ -306,8 +307,61 @@ export function StudentsManagementPage() {
 
       {/* Verification Modal */}
       {showVerifyModal && selectedRegistration && (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 p-4">
-            {/* ... Konten Modal Verifikasi ... */}
+        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={() => { if (!verifying) { setShowVerifyModal(false); setSelectedRegistration(null); } }}>
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
+            <div className="p-6 border-b border-gray-100">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
+                  <CheckCircle className="w-5 h-5 text-green-700" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Verifikasi Pendaftaran Santri</h3>
+                  <p className="text-sm text-gray-600">Pastikan data pendaftaran sudah benar sebelum verifikasi.</p>
+                </div>
+              </div>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-1 gap-3">
+                <div>
+                  <p className="text-sm text-gray-500">Nama Santri</p>
+                  <p className="font-semibold text-gray-900">{selectedRegistration.nama_santri}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Nama Wali</p>
+                  <p className="font-semibold text-gray-900">{selectedRegistration.nama_wali}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Email Wali</p>
+                  <p className="font-semibold text-gray-900">{selectedRegistration.email_wali}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Tanggal Daftar</p>
+                  <p className="font-semibold text-gray-900">{new Date(selectedRegistration.tanggal_daftar).toLocaleDateString('id-ID')}</p>
+                </div>
+              </div>
+              <div className="p-3 bg-yellow-50 text-yellow-800 rounded-xl text-sm">
+                Setelah verifikasi, sistem akan membuat akun santri dan mengirimkan kredensial (username dan password) yang ditampilkan pada notifikasi.
+              </div>
+            </div>
+            <div className="p-6 bg-gray-50 rounded-b-3xl flex justify-end space-x-3">
+              <button disabled={verifying} onClick={() => { setShowVerifyModal(false); setSelectedRegistration(null); }} className={`px-5 py-2 rounded-xl font-semibold transition-colors ${verifying ? 'bg-gray-200 text-gray-500' : 'bg-white text-gray-800 border border-gray-300 hover:bg-gray-100'}`}>Batal</button>
+              <button
+                onClick={async () => {
+                  if (!selectedRegistration) return;
+                  try {
+                    setVerifying(true);
+                    await handleVerifyRegistration(selectedRegistration.id);
+                  } finally {
+                    setVerifying(false);
+                  }
+                }}
+                disabled={verifying}
+                className={`px-5 py-2 rounded-xl font-semibold text-white transition-colors ${verifying ? 'bg-green-300' : 'bg-green-600 hover:bg-green-700'}`}
+              >
+                {verifying ? 'Memverifikasi...' : 'Verifikasi' }
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
