@@ -7,8 +7,9 @@ interface SidebarProps {
   isOpen: boolean;
   onToggle: () => void;
   userRole?: string;
-}
-const menuItems = [
+}
+
+const parentMenuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: Home, path: '/parent/dashboard' },
   { id: 'payment', label: 'Pembayaran', icon: CreditCard, path: '/parent/payment' },
   { id: 'hafalan', label: 'Hafalan', icon: BookOpen, path: '/parent/hafalan' },
@@ -16,8 +17,15 @@ const menuItems = [
   { id: 'profile', label: 'Profil', icon: User, path: '/parent/profile' },
 ];
 
-export function Sidebar({ isOpen, onToggle }: SidebarProps) {
+const guruMenuItems = [
+  { id: 'dashboard', label: 'Dashboard', icon: Home, path: '/guru/dashboard' },
+  { id: 'santri', label: 'Santri', icon: GraduationCap, path: '/guru/santri' },
+  { id: 'kehadiran', label: 'Kehadiran', icon: BookOpen, path: '/guru/kehadiran' },
+];
+
+export function Sidebar({ isOpen, onToggle, userRole }: SidebarProps) {
   const { logout, user } = useAuth();
+  const isGuruRole = userRole === 'Guru' || userRole === 'Wali Kelas';
 
   useEffect(() => {
     const handleResize = () => {
@@ -34,14 +42,18 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
       <div className={`fixed inset-y-0 left-0 z-40 w-72 bg-white shadow-2xl border-r border-gray-100 transform transition-transform duration-300 ease-in-out lg:relative lg:transform-none lg:shadow-none ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex flex-col h-full">
           {/* HEADER */}
-          <div className="flex items-center justify-between h-20 px-6 border-b border-gray-100 bg-gradient-to-r from-teal-600 to-teal-700">
+          <div className={`flex items-center justify-between h-20 px-6 border-b border-gray-100 bg-gradient-to-r ${isGuruRole ? 'from-indigo-600 to-indigo-700' : 'from-teal-600 to-teal-700'}`}>
             <div className="flex items-center">
               <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center mr-3 shadow-lg">
-                <BookOpen className="w-7 h-7 text-teal-600" />
+                {isGuruRole ? (
+                  <GraduationCap className="w-7 h-7 text-indigo-600" />
+                ) : (
+                  <BookOpen className="w-7 h-7 text-teal-600" />
+                )}
               </div>
               <div>
-                <h1 className="text-lg font-bold text-white">Wali Santri</h1>
-                <p className="text-xs text-teal-100 font-medium">Portal Monitoring</p>
+                <h1 className="text-lg font-bold text-white">{isGuruRole ? 'Wali Kelas' : 'Wali Santri'}</h1>
+                <p className={`text-xs font-medium ${isGuruRole ? 'text-indigo-100' : 'text-teal-100'}`}>Portal {isGuruRole ? 'Manajemen Kelas' : 'Monitoring'}</p>
               </div>
             </div>
             <button
@@ -57,7 +69,7 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
           {/* NAVIGATION */}
           <nav className="mt-8 px-4">
             <ul className="space-y-3">
-              {menuItems.map((item) => {
+              {(isGuruRole ? guruMenuItems : parentMenuItems).map((item) => {
                 const IconComponent = item.icon;
 
                 return (
@@ -70,7 +82,9 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
                       className={({ isActive }) =>
                         `group w-full flex items-center px-4 py-3.5 text-sm font-medium rounded-xl transition-all duration-200 ${
                           isActive
-                            ? 'bg-gradient-to-r from-teal-50 to-teal-50 text-teal-700 border-r-4 border-teal-600 shadow-sm'
+                            ? (isGuruRole
+                                ? 'bg-gradient-to-r from-indigo-50 to-indigo-50 text-indigo-700 border-r-4 border-indigo-600 shadow-sm'
+                                : 'bg-gradient-to-r from-teal-50 to-teal-50 text-teal-700 border-r-4 border-teal-600 shadow-sm')
                             : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 hover:translate-x-1 hover:shadow-sm'
                         }`
                       }
@@ -80,7 +94,9 @@ export function Sidebar({ isOpen, onToggle }: SidebarProps) {
                           <IconComponent
                             size={20}
                             className={`mr-4 flex-shrink-0 transition-colors ${
-                              isActive ? 'text-teal-600' : 'text-gray-400 group-hover:text-gray-600'
+                              isActive
+                                ? (isGuruRole ? 'text-indigo-600' : 'text-teal-600')
+                                : 'text-gray-400 group-hover:text-gray-600'
                             }`}
                           />
                           <span className="font-medium">{item.label}</span>

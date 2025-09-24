@@ -193,9 +193,29 @@ export const login = async (req: Request, res: Response) => {
             if (guruRows.length === 0) {
                 return res.status(403).json({ success: false, error: 'Akun Guru tidak tertaut.' });
             }
+
+            const idGuru = guruRows[0].id;
+            // Cek apakah guru ini adalah wali kelas pada tabel kelas
+            const [kelasRows] = await pool.query<RowDataPacket[]>(
+                `SELECT k.id, k.nama_kelas, jp.nama_jenjang
+                 FROM kelas k
+                 LEFT JOIN jenjang_pendidikan jp ON k.id_jenjang = jp.id
+                 WHERE k.id_wali_kelas = ?
+                 LIMIT 1`,
+                [idGuru]
+            );
+            const isWaliKelas = kelasRows.length > 0;
+
             sessionPayload = {
-                id_pengguna: user.id, username: user.username, nama_pengguna: user.nama_lengkap,
-                peran: user.peran as 'Guru', id_guru: guruRows[0].id, jabatan: guruRows[0].jabatan
+                id_pengguna: user.id,
+                username: user.username,
+                nama_pengguna: user.nama_lengkap,
+                peran: (isWaliKelas ? 'Wali Kelas' : 'Guru') as 'Guru',
+                id_guru: idGuru,
+                jabatan: guruRows[0].jabatan,
+                // Tambahkan nama_kelas dan nama_jenjang jika wali kelas
+                nama_kelas: isWaliKelas ? (kelasRows[0] as any).nama_kelas : undefined,
+                nama_jenjang: isWaliKelas ? (kelasRows[0] as any).nama_jenjang : undefined
             };
         } else if (userRole === 'bendahara') {
             sessionPayload = {

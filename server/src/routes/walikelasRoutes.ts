@@ -6,7 +6,9 @@ import {
     createCatatanPerilaku,
     getCatatanPerilaku,
     updateCatatanPerilaku,
-    deleteCatatanPerilaku
+    deleteCatatanPerilaku,
+    getNilaiSantri,
+    getRekapKehadiran
 } from '../controllers/walikelasController.js';
 
 const router: Router = express.Router();
@@ -17,5 +19,7 @@ router.post('/santri/:id_santri/perilaku', createCatatanPerilaku);
 router.get('/santri/:id_santri/perilaku', getCatatanPerilaku);
 router.put('/perilaku/:id_catatan', updateCatatanPerilaku);
 router.delete('/perilaku/:id_catatan', deleteCatatanPerilaku);
+router.get('/santri/:id_santri/nilai', getNilaiSantri);
+router.get('/absensi', getRekapKehadiran);
 
 export default router;

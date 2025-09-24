@@ -49,7 +49,11 @@ export const isWaliKelas = async (req: RequestWithWaliKelas, res: Response, next
 
 export const getSantriByWaliKelas = async (req: RequestWithWaliKelas, res: Response) => {
     const id_kelas = req.id_kelas_wali;
-    const tahun_ajaran = String(req.query.tahun_ajaran || new Date().getFullYear());
+    // Default tahun ajaran ke format YYYY/YYYY+1
+    const now = new Date();
+    const startYear = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1; // asumsi ajaran mulai Juli
+    const defaultTahunAjaran = `${startYear}/${startYear + 1}`;
+    const tahun_ajaran = String(req.query.tahun_ajaran || defaultTahunAjaran);
     try {
         const query = `
             SELECT s.id, s.nama_lengkap, s.nisn, s.foto_profil, jp.nama_jenjang, k.nama_kelas
@@ -75,9 +79,23 @@ export const setKenaikanKelas = async (req: RequestWithWaliKelas, res: Response)
     const { status_kenaikan, tahun_ajaran } = bodyValidation.data;
     
     try {
-        const [result] = await pool.query<OkPacket>('UPDATE santri_kelas SET status_kenaikan = ? WHERE id_santri = ? AND id_kelas = ? AND tahun_ajaran = ?', [status_kenaikan, id_santri, id_kelas_wali, tahun_ajaran]);
-        if (result.affectedRows === 0) return res.status(404).json({ success: false, error: "Santri tidak ditemukan di kelas Anda pada tahun ajaran ini." });
-        
+        const [result] = await pool.query<OkPacket>(
+            'UPDATE santri_kelas SET status_kenaikan = ? WHERE id_santri = ? AND id_kelas = ? AND tahun_ajaran = ?',
+            [status_kenaikan, id_santri, id_kelas_wali, tahun_ajaran]
+        );
+        if (result.affectedRows === 0) {
+            // Jika baris belum ada (misalnya untuk tahun ajaran berikutnya), coba buat barisnya
+            try {
+                await pool.query<OkPacket>(
+                    'INSERT INTO santri_kelas (id_santri, id_kelas, tahun_ajaran, status_kenaikan) VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE status_kenaikan = VALUES(status_kenaikan)',
+                    [id_santri, id_kelas_wali, tahun_ajaran, status_kenaikan]
+                );
+                return res.status(200).json({ success: true, data: { message: `Status kenaikan untuk santri berhasil ditetapkan.` } });
+            } catch (e: any) {
+                // Jika insert gagal (mis. constraint lain), kembalikan pesan yang informatif
+                return res.status(404).json({ success: false, error: "Santri tidak ditemukan di kelas Anda pada tahun ajaran ini dan tidak dapat dibuat otomatis." });
+            }
+        }
         res.status(200).json({ success: true, data: { message: `Status kenaikan untuk santri berhasil ditetapkan.` } });
     } catch (error: any) {
         res.status(500).json({ success: false, error: "Gagal menetapkan status kenaikan." });
@@ -178,5 +196,87 @@ export const deleteCatatanPerilaku = async (req: RequestWithWaliKelas, res: Resp
         res.status(200).json({ success: true, data: { message: "Catatan perilaku berhasil dihapus." } });
     } catch (error: any) {
         res.status(500).json({ success: false, error: "Gagal menghapus catatan." });
+    }
+};
+
+// --- NILAI SANTRI OLEH WALI KELAS ---
+export const getNilaiSantri = async (req: RequestWithWaliKelas, res: Response) => {
+    const { id_santri } = req.params as { id_santri: string };
+    const id_kelas = req.id_kelas_wali;
+    const { tahun_ajaran, semester } = req.query as { tahun_ajaran?: string; semester?: string };
+
+    try {
+        // Pastikan santri ini berada di kelas wali pada tahun ajaran terkait (jika tahun ajaran diberikan)
+        const whereTA = tahun_ajaran ? 'AND sk.tahun_ajaran = ?' : '';
+        const params: any[] = [id_santri, id_kelas];
+        if (tahun_ajaran) params.push(tahun_ajaran);
+
+        const [cekSantri] = await pool.query<RowDataPacket[]>(
+            `SELECT sk.id_santri FROM santri_kelas sk WHERE sk.id_santri = ? AND sk.id_kelas = ? ${whereTA} LIMIT 1`,
+            params
+        );
+        if (cekSantri.length === 0) {
+            return res.status(404).json({ success: false, error: 'Santri tidak ditemukan di kelas Anda pada tahun ajaran ini.' });
+        }
+
+        // Ambil nilai
+        const nilaiParams: any[] = [id_santri];
+        let nilaiWhere = 'WHERE n.id_santri = ?';
+        if (tahun_ajaran) { nilaiWhere += ' AND n.tahun_ajaran = ?'; nilaiParams.push(tahun_ajaran); }
+        if (semester) { nilaiWhere += ' AND n.semester = ?'; nilaiParams.push(semester); }
+
+        const [nilaiList] = await pool.query<RowDataPacket[]>(
+            `SELECT n.tahun_ajaran, n.semester, mp.nama_mapel, n.nilai_tugas, n.nilai_uts, n.nilai_uas, n.nilai_akhir
+             FROM nilai n
+             JOIN mata_pelajaran mp ON n.id_mapel = mp.id
+             ${nilaiWhere}
+             ORDER BY n.tahun_ajaran DESC, n.semester DESC, mp.nama_mapel ASC`,
+            nilaiParams
+        );
+
+        const grouped = (nilaiList as any[]).reduce((acc: any, row: any) => {
+            const key = `${row.tahun_ajaran} - Semester ${row.semester}`;
+            if (!acc[key]) acc[key] = [];
+            acc[key].push({
+                mata_pelajaran: row.nama_mapel,
+                nilai_tugas: row.nilai_tugas,
+                nilai_uts: row.nilai_uts,
+                nilai_uas: row.nilai_uas,
+                nilai_akhir: row.nilai_akhir,
+            });
+            return acc;
+        }, {} as Record<string, any[]>);
+
+        res.status(200).json({ success: true, data: grouped });
+    } catch (error) {
+        res.status(500).json({ success: false, error: 'Gagal mengambil data nilai santri.' });
+    }
+};
+
+// --- REKAP KEHADIRAN PER SANTRI ---
+export const getRekapKehadiran = async (req: RequestWithWaliKelas, res: Response) => {
+    const id_kelas = req.id_kelas_wali;
+    const { tahun_ajaran } = req.query as { tahun_ajaran?: string };
+    try {
+        const whereTA = tahun_ajaran ? 'AND a.tahun_ajaran = ?' : '';
+        const params: any[] = [id_kelas];
+        if (tahun_ajaran) params.push(tahun_ajaran);
+        const [rows] = await pool.query<RowDataPacket[]>(
+            `SELECT s.id AS id_santri, s.nama_lengkap, s.nisn,
+                SUM(CASE WHEN a.status = 'Hadir' THEN 1 ELSE 0 END) AS hadir,
+                SUM(CASE WHEN a.status = 'Sakit' THEN 1 ELSE 0 END) AS sakit,
+                SUM(CASE WHEN a.status = 'Izin' THEN 1 ELSE 0 END) AS izin,
+                SUM(CASE WHEN a.status = 'Alfa' THEN 1 ELSE 0 END) AS alfa
+             FROM santri s
+             JOIN santri_kelas sk ON sk.id_santri = s.id
+             LEFT JOIN absensi a ON a.id_santri = s.id
+             WHERE sk.id_kelas = ? ${whereTA}
+             GROUP BY s.id, s.nama_lengkap, s.nisn
+             ORDER BY s.nama_lengkap`,
+            params
+        );
+        res.status(200).json({ success: true, data: rows });
+    } catch (error) {
+        res.status(500).json({ success: false, error: 'Gagal mengambil rekap kehadiran.' });
     }
 };
