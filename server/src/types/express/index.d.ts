@@ -6,10 +6,12 @@ interface UserSessionData {
     jabatan: string;
     id_pengguna: number;
     username: string;
-    peran: 'Admin' | 'Guru' | 'Santri' | 'Wali Santri' | 'Bendahara';
+    peran: 'Admin' | 'Guru' | 'Wali Kelas' | 'Santri' | 'Wali Santri' | 'Bendahara';
     nama_pengguna?: string;
     nama_santri?: string;
     id_santri?: number;
+    nama_kelas?: string | null;
+    nama_jenjang?: string | null;
 }
 
 declare global {

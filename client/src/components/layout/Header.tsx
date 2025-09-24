@@ -8,7 +8,7 @@ export function Header() {
   const { student, isLoading } = useStudentData();
 
   let studentName = user?.nama_pengguna || user?.username || "Pengguna";
-  let className = "Data Tidak Tersedia";
+  let className = user?.nama_kelas || "";
   let photoUrl = null;
 
   if (!isLoading && student) {
@@ -31,7 +31,7 @@ export function Header() {
         )}
         <div>
           <h2 className="text-lg font-semibold text-gray-800">{studentName}</h2>
-          <p className="text-sm text-gray-500">{className}</p>
+          {className && <p className="text-sm text-gray-500">{className}</p>}
         </div>
       </div>
       <div className="flex items-center space-x-4">

@@ -7,6 +7,8 @@ import { ParentRoutes } from './components/ParentModule/parentroutes';
 import { MainTemplate } from './components/ParentModule/templates/MainTemplate';
 import { useAuth } from './contexts/AuthContexts';
 import { DashboardPage } from './components/ParentModule/pages/DashboardPage';
+import { WaliKelasRoutes } from './components/WaliKelasModule/WaliKelasRoutes';
+import { RoleChooserPage } from './components/WaliKelasModule/pages/RoleChooserPage';
 import { AdminRoutes } from './components/AdminModule/AdminRoutes';
 import { BendaharaRoutes } from './components/BendaharaModule/BendaharaRoutes';
 import { StudentDataProvider } from './contexts/StudentDataContext';
@@ -64,10 +66,21 @@ function App() {
       <Route
         path="/guru/*"
         element={
-          <ProtectedRoute isAllowed={isLoggedIn && user?.peran === "Guru"}>
-            <MainTemplate>
-              <div>Halaman Guru (nanti buat GuruRoutes)</div>
-            </MainTemplate>
+          <ProtectedRoute isAllowed={isLoggedIn && (user?.peran === "Guru" || user?.peran === "Wali Kelas") }>
+            <StudentDataProvider>
+              <MainTemplate>
+                <WaliKelasRoutes />
+              </MainTemplate>
+            </StudentDataProvider>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/choose-role"
+        element={
+          <ProtectedRoute isAllowed={isLoggedIn && user?.peran === 'Wali Kelas'}>
+            {/* Tanpa Sidebar/Header agar mirip login */}
+            <RoleChooserPage />
           </ProtectedRoute>
         }
       />
